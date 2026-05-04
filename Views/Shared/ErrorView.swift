@@ -5,10 +5,19 @@ import SwiftUI
 struct ErrorView: View {
     let error: PortainerError
     let retry: (() -> Void)?
+    let secondaryActionTitle: String?
+    let secondaryAction: (() -> Void)?
 
-    init(error: PortainerError, retry: (() -> Void)? = nil) {
+    init(
+        error: PortainerError,
+        retry: (() -> Void)? = nil,
+        secondaryActionTitle: String? = nil,
+        secondaryAction: (() -> Void)? = nil
+    ) {
         self.error = error
         self.retry = retry
+        self.secondaryActionTitle = secondaryActionTitle
+        self.secondaryAction = secondaryAction
     }
 
     var body: some View {
@@ -21,10 +30,13 @@ struct ErrorView: View {
                 Button("Try again", action: retry)
                     .buttonStyle(.borderedProminent)
             }
+            if let secondaryActionTitle, let secondaryAction {
+                Button(secondaryActionTitle, action: secondaryAction)
+            }
         }
     }
 }
 
 #Preview {
-    ErrorView(error: .unauthorized) { }
+    ErrorView(error: .unauthorized, retry: { })
 }

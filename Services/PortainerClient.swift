@@ -16,25 +16,28 @@ actor PortainerClient {
     private let session: URLSession
     private let decoder: JSONDecoder
 
-    /// `password` is supplied lazily when the token expires and we need to re-auth. Held only in memory
-    /// for the actor's lifetime - never persisted. If nil, a 401 just throws `.unauthorized`.
+    /// `password` is supplied lazily when the token expires and we need to re-auth. If not passed in
+    /// directly, we fall back to the Keychain copy saved for seamless relaunches.
     private var cachedPassword: String?
 
     init(host: Host, password: String? = nil, allowsInsecureTLS: Bool = false) throws {
         let trimmedBaseURL = host.baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let url = URL(string: trimmedBaseURL) else {
+        guard let rawURL = URL(string: trimmedBaseURL) else {
             throw PortainerError.invalidURL
         }
+        let url = Self.sanitizedBaseURL(from: rawURL)
         self.hostID = host.id
         self.baseURL = url
         self.username = host.username
-        self.cachedPassword = password
+        self.cachedPassword = password ?? (try? KeychainService.password(for: host.id))
         self.jwt = try? KeychainService.token(for: host.id)
 
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 600
         config.waitsForConnectivity = false
+        config.httpShouldSetCookies = false
+        config.httpCookieAcceptPolicy = .never
 
         if allowsInsecureTLS {
             // Use the delegate-driven session that allows self-signed certs.
@@ -55,12 +58,12 @@ actor PortainerClient {
         let body = ["username": username, "password": password]
         let request = try makeRequest(path: "/api/auth", method: "POST", body: body, requiresAuth: false)
 
-        Self.logger.info("Authenticating against \(request.url?.absoluteString ?? "<nil>", privacy: .public)")
+        Self.logger.info("Authenticating against host \(self.hostID.uuidString, privacy: .private(mask: .hash))")
         let (data, response) = try await performRequest(request)
         guard let http = response as? HTTPURLResponse else {
             throw PortainerError.serverError(code: -1, message: "Invalid response")
         }
-        Self.logger.info("Authentication response \(http.statusCode) from \(request.url?.absoluteString ?? "<nil>", privacy: .public)")
+        Self.logger.info("Authentication response \(http.statusCode) for host \(self.hostID.uuidString, privacy: .private(mask: .hash))")
         guard http.statusCode == 200 else {
             if http.statusCode == 401 || http.statusCode == 422 {
                 throw PortainerError.unauthorized
@@ -72,7 +75,8 @@ actor PortainerClient {
             let auth = try decoder.decode(AuthResponse.self, from: data)
             self.jwt = auth.jwt
             try KeychainService.store(token: auth.jwt, for: hostID)
-            Self.logger.info("Stored JWT for host \(self.hostID.uuidString, privacy: .public)")
+            try KeychainService.store(password: password, for: hostID)
+            Self.logger.info("Stored JWT for host \(self.hostID.uuidString, privacy: .private(mask: .hash))")
         } catch let error as DecodingError {
             throw PortainerError.decoding(String(describing: error))
         }
@@ -306,7 +310,7 @@ actor PortainerClient {
         if requiresAuth, let jwt {
             request.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
         }
-        Self.logger.debug("Prepared \(method, privacy: .public) \(url.absoluteString, privacy: .public)")
+        Self.logger.debug("Prepared \(method, privacy: .public) request for host \(self.hostID.uuidString, privacy: .private(mask: .hash))")
         return request
     }
 
@@ -320,7 +324,7 @@ actor PortainerClient {
         guard let password = cachedPassword else {
             throw PortainerError.unauthorized
         }
-        Self.logger.notice("JWT expired for host \(self.hostID.uuidString, privacy: .public); reauthenticating")
+        Self.logger.notice("JWT expired for host \(self.hostID.uuidString, privacy: .private(mask: .hash)); reauthenticating")
         try await authenticate(password: password)
         var retried = request
         if let jwt {
@@ -339,7 +343,7 @@ actor PortainerClient {
             guard let password = cachedPassword else {
                 throw PortainerError.unauthorized
             }
-            Self.logger.notice("Streaming request hit 401 for host \(self.hostID.uuidString, privacy: .public); reauthenticating")
+            Self.logger.notice("Streaming request hit 401 for host \(self.hostID.uuidString, privacy: .private(mask: .hash)); reauthenticating")
             try await authenticate(password: password)
             var retried = request
             if let jwt {
@@ -355,11 +359,11 @@ actor PortainerClient {
         do {
             let (data, response) = try await session.data(for: request)
             if let http = response as? HTTPURLResponse {
-                Self.logger.debug("Received \(http.statusCode) from \(request.url?.absoluteString ?? "<nil>", privacy: .public)")
+                Self.logger.debug("Received \(http.statusCode) for host \(self.hostID.uuidString, privacy: .private(mask: .hash))")
             }
             return (data, response)
         } catch let error as URLError {
-            Self.logger.error("Network error for \(request.url?.absoluteString ?? "<nil>", privacy: .public): \(error.localizedDescription, privacy: .public)")
+            Self.logger.error("Network error for host \(self.hostID.uuidString, privacy: .private(mask: .hash)): \(error.localizedDescription, privacy: .private)")
             throw PortainerError.network(error)
         }
     }
@@ -370,9 +374,9 @@ actor PortainerClient {
         }
         let message = responseMessage(from: data)
         if let message {
-            Self.logger.error("HTTP \(http.statusCode) for \(http.url?.absoluteString ?? "<nil>", privacy: .public): \(message, privacy: .public)")
+            Self.logger.error("HTTP \(http.statusCode) for host \(self.hostID.uuidString, privacy: .private(mask: .hash)): \(message, privacy: .private)")
         } else {
-            Self.logger.error("HTTP \(http.statusCode) for \(http.url?.absoluteString ?? "<nil>", privacy: .public)")
+            Self.logger.error("HTTP \(http.statusCode) for host \(self.hostID.uuidString, privacy: .private(mask: .hash))")
         }
         return switch http.statusCode {
         case 401: .unauthorized
@@ -390,6 +394,36 @@ actor PortainerClient {
         } else if components.path.isEmpty {
             components.path = "/"
         }
+        components.query = nil
+        components.fragment = nil
+        return components.url ?? url
+    }
+
+    nonisolated private static func sanitizedBaseURL(from url: URL) -> URL {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return url
+        }
+
+        var path = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let trimmedFragment = components.fragment?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Users often paste the API root or a login URL copied from the browser.
+        if path == "api" {
+            path = ""
+        } else if path.hasSuffix("/api") {
+            path.removeLast(4)
+            path = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        }
+
+        if let trimmedFragment, trimmedFragment.contains("auth") || trimmedFragment.contains("login") {
+            components.fragment = nil
+        }
+
+        if path == "auth" || path == "login" {
+            path = ""
+        }
+
+        components.path = path.isEmpty ? "" : "/" + path
         components.query = nil
         components.fragment = nil
         return components.url ?? url

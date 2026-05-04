@@ -37,6 +37,7 @@ final class DashboardViewModel {
     /// Begins streaming stats for every running container and refreshes the container list periodically.
     func start() {
         guard refreshTask == nil else { return }
+        loadError = nil
         isStreaming = true
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -53,8 +54,6 @@ final class DashboardViewModel {
             task.cancel()
         }
         streamTasks.removeAll()
-        histories.removeAll()
-        displayNames.removeAll()
         isStreaming = false
     }
 
@@ -79,7 +78,12 @@ final class DashboardViewModel {
                 }
             }
             recomputeTops()
+        } catch is CancellationError {
+            return
         } catch let error as PortainerError {
+            if case .network(let urlError) = error, urlError.code == .cancelled {
+                return
+            }
             self.loadError = error
         } catch {
             self.loadError = .serverError(code: -1, message: error.localizedDescription)
@@ -95,6 +99,15 @@ final class DashboardViewModel {
                     guard let self else { return }
                     self.record(sample, for: id)
                 }
+            } catch is CancellationError {
+                return
+            } catch let error as PortainerError where {
+                if case .network(let urlError) = error {
+                    return urlError.code == .cancelled
+                }
+                return false
+            }() {
+                return
             } catch {
                 // Swallow per-container errors; surfacing them all would be noisy.
             }

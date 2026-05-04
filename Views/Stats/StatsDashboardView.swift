@@ -50,7 +50,7 @@ struct StatsDashboardView: View {
                 }
             }
         }
-        .onAppear { Task { await viewModel.start() } }
+        .onAppear { viewModel.start() }
         .onDisappear { viewModel.stop() }
     }
 }

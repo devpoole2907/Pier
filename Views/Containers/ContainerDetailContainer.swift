@@ -7,22 +7,13 @@ import SwiftData
 struct ContainerDetailContainer: View {
     let navigationValue: ContainerNavigationValue
 
-    @Environment(HostManager.self) private var hostManager
-    @Environment(\.modelContext) private var modelContext
-
     var body: some View {
-        if let active = hostManager.activeClient(in: modelContext) {
+        ActiveHostGate { _, client, endpointID in
             ContainerDetailView(
-                client: active.client,
-                endpointID: active.endpointID,
+                client: client,
+                endpointID: endpointID,
                 containerID: navigationValue.containerID,
                 initialName: navigationValue.displayName
-            )
-        } else {
-            EmptyStateView(
-                title: "No active host",
-                systemImage: "externaldrive.badge.questionmark",
-                message: "Select a Portainer host in Settings to continue."
             )
         }
     }

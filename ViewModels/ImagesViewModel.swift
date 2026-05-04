@@ -55,6 +55,19 @@ final class ImagesViewModel {
         }
     }
 
+    func delete(_ images: [DockerImage], force: Bool = false) async {
+        do {
+            for image in images {
+                try await client.deleteImage(endpointID: endpointID, imageID: image.id, force: force)
+            }
+            await load()
+        } catch let error as PortainerError {
+            self.loadError = error
+        } catch {
+            self.loadError = .serverError(code: -1, message: error.localizedDescription)
+        }
+    }
+
     /// Pulls a `name:tag` reference. If `tag` is omitted defaults to "latest".
     func pull(reference: String) async {
         let trimmed = reference.trimmingCharacters(in: .whitespaces)

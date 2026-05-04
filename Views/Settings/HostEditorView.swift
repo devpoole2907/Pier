@@ -152,17 +152,13 @@ struct HostEditorView: View {
         }
     }
 
-    private var isBaseURLValid: Bool {
-        urlValidationMessage == nil && !baseURL.isEmpty
-    }
-
     private var canTest: Bool {
-        isBaseURLValid && !username.isEmpty && !password.isEmpty && connectionTest != .testing
+        !baseURL.isEmpty && !username.isEmpty && !password.isEmpty && connectionTest != .testing
     }
 
     private var canSave: Bool {
         !name.isEmpty
-            && isBaseURLValid
+            && !baseURL.isEmpty
             && !username.isEmpty
             && (existingHost != nil || !password.isEmpty)
     }
@@ -185,7 +181,7 @@ struct HostEditorView: View {
 
     private func testConnection() async {
         connectionTest = .testing
-        hostEditorLogger.info("Testing Portainer connection for \(baseURL, privacy: .public) as \(username, privacy: .public)")
+        hostEditorLogger.info("Testing Portainer connection for username \(username, privacy: .private)")
         do {
             let candidate = Host(
                 name: name.isEmpty ? "Test" : name,
@@ -197,18 +193,18 @@ struct HostEditorView: View {
             try await client.authenticate(password: password)
             _ = try await client.listEndpoints()
             connectionTest = .success
-            hostEditorLogger.info("Connection test succeeded for \(baseURL, privacy: .public)")
+            hostEditorLogger.info("Connection test succeeded")
         } catch let error as PortainerError {
-            connectionTest = .failure(error.errorDescription ?? "Connection failed")
-            hostEditorLogger.error("Connection test failed for \(baseURL, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            connectionTest = .failure(connectionFailureMessage(for: error))
+            hostEditorLogger.error("Connection test failed: \(error.localizedDescription, privacy: .private)")
         } catch {
             connectionTest = .failure(error.localizedDescription)
-            hostEditorLogger.error("Connection test failed for \(baseURL, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            hostEditorLogger.error("Connection test failed: \(error.localizedDescription, privacy: .private)")
         }
     }
 
     private func save() async {
-        hostEditorLogger.info("Saving host \(name, privacy: .public) at \(baseURL, privacy: .public)")
+        hostEditorLogger.info("Saving host configuration")
         do {
             let host: Host
             if let existing = existingHost {
@@ -235,14 +231,25 @@ struct HostEditorView: View {
                 try await hostManager.authenticate(host: host, password: password)
             }
             await hostManager.setActive(host)
-            hostEditorLogger.info("Saved host \(host.name, privacy: .public)")
+            hostEditorLogger.info("Saved host configuration")
             dismiss()
         } catch let error as PortainerError {
-            connectionTest = .failure(error.errorDescription ?? "Save failed")
-            hostEditorLogger.error("Failed to save host \(name, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            connectionTest = .failure(connectionFailureMessage(for: error))
+            hostEditorLogger.error("Failed to save host configuration: \(error.localizedDescription, privacy: .private)")
         } catch {
             connectionTest = .failure(error.localizedDescription)
-            hostEditorLogger.error("Failed to save host \(name, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            hostEditorLogger.error("Failed to save host configuration: \(error.localizedDescription, privacy: .private)")
         }
+    }
+
+    private func connectionFailureMessage(for error: PortainerError) -> String {
+        if case .serverError(_, let message) = error,
+           let message {
+            let lowered = message.lowercased()
+            if lowered.contains("csrf token not found") || lowered.contains("origin invalid") {
+                return "Portainer rejected the request before API auth. Use the Portainer root URL, not a login page or /api path."
+            }
+        }
+        return error.errorDescription ?? "Connection failed"
     }
 }

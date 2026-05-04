@@ -9,11 +9,11 @@ struct ContainerSwipeActions: View {
     var body: some View {
         if container.state == .running {
             Button("Stop", systemImage: "stop.fill") {
-                Task { await viewModel.stop(container) }
+                viewModel.stop(container)
             }
             .tint(.orange)
             Button("Restart", systemImage: "arrow.clockwise") {
-                Task { await viewModel.restart(container) }
+                viewModel.restart(container)
             }
             .tint(.blue)
         } else {

@@ -16,9 +16,9 @@ struct ContainerLogsView: View {
     var body: some View {
         Group {
             if let error = viewModel.loadError, viewModel.lines.isEmpty {
-                ErrorView(error: error) {
+                ErrorView(error: error, retry: {
                     Task { await viewModel.loadInitial() }
-                }
+                })
             } else if viewModel.lines.isEmpty {
                 LoadingView(message: "Fetching logs…")
             } else {
@@ -39,9 +39,10 @@ struct ContainerLogsView: View {
     @ToolbarContentBuilder
     private var logsToolbar: some ToolbarContent {
         ToolbarItem(placement: toolbarTrailingPlacement) {
-            Button(viewModel.isFollowing ? "Stop following" : "Follow",
+            Button(viewModel.isFollowing ? "Stop Live Tail" : "Start Live Tail",
                    systemImage: viewModel.isFollowing ? "dot.radiowaves.left.and.right" : "dot.radiowaves.right",
                    action: toggleFollowing)
+                .help(viewModel.isFollowing ? "Stop streaming new log lines as they arrive." : "Start streaming new log lines as they arrive.")
         }
         ToolbarItem(placement: toolbarTrailingPlacement) {
             Button("Copy", systemImage: "doc.on.doc", action: copyToClipboard)

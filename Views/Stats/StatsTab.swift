@@ -10,21 +10,22 @@ struct StatsTab: View {
         NavigationStack {
             StatsContainer()
                 .navigationTitle("Stats")
+                .navigationSubtitle(activeHostName)
+                .hostTitleMenu()
         }
+    }
+
+    private var activeHostName: String {
+        hostManager.activeClient(in: modelContext)?.host.name ?? ""
     }
 }
 
 /// Resolves the active host then renders the dashboard.
 struct StatsContainer: View {
-    @Environment(HostManager.self) private var hostManager
-    @Environment(\.modelContext) private var modelContext
-
     var body: some View {
-        if let active = hostManager.activeClient(in: modelContext) {
-            StatsDashboardView(client: active.client, endpointID: active.endpointID)
-                .id(active.host.id)
-        } else {
-            NoHostConfiguredView()
+        ActiveHostGate { host, client, endpointID in
+            StatsDashboardView(client: client, endpointID: endpointID)
+                .id(host.id)
         }
     }
 }

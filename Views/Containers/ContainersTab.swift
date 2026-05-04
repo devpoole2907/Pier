@@ -12,6 +12,7 @@ struct ContainersTab: View {
         NavigationStack {
             ContainerListContainer()
                 .navigationTitle("Containers")
+                .hostTitleMenu()
                 .navigationDestination(for: ContainerNavigationValue.self) { value in
                     ContainerDetailContainer(navigationValue: value)
                 }

@@ -3,15 +3,23 @@ import SwiftData
 
 /// Main settings screen. Splits configuration into sections: hosts, refresh, theme, display, about.
 struct SettingsView: View {
+    @Environment(HostManager.self) private var hostManager
     @AppStorage("refreshIntervalSeconds") private var refreshIntervalRaw: Int = RefreshInterval.medium.rawValue
     @AppStorage("themePreference") private var themeRawValue: String = AppTheme.system.rawValue
     @AppStorage("showStoppedContainers") private var showStoppedContainers: Bool = true
+    @Query(sort: \Host.createdAt) private var hosts: [Host]
 
     var body: some View {
         Form {
             Section("Hosts") {
                 NavigationLink(value: SettingsRoute.hostsList) {
-                    Label("Manage hosts", systemImage: "externaldrive")
+                    LabeledContent {
+                        Text(activeHostName)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    } label: {
+                        Label("Manage hosts", systemImage: "externaldrive")
+                    }
                 }
             }
 
@@ -53,10 +61,6 @@ struct SettingsView: View {
             switch route {
             case .hostsList:
                 HostsListView()
-            case .editHost(let id):
-                HostEditorContainer(hostID: id)
-            case .newHost:
-                HostEditorView(host: nil)
             }
         }
     }
@@ -67,11 +71,17 @@ struct SettingsView: View {
         let build = info?["CFBundleVersion"] as? String ?? "1"
         return "\(version) (\(build))"
     }
+
+    private var activeHostName: String {
+        guard let activeHostID = hostManager.activeHostID,
+              let activeHost = hosts.first(where: { $0.id == activeHostID }) else {
+            return "None"
+        }
+        return activeHost.name
+    }
 }
 
 /// Routes used by the Settings navigation stack.
 enum SettingsRoute: Hashable {
     case hostsList
-    case editHost(UUID)
-    case newHost
 }

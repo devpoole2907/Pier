@@ -3,6 +3,11 @@ import SwiftUI
 /// Centralised design tokens. Pulled from `design.md` guidance: defining shared spacing, rounding,
 /// and animation timings up front means the look stays consistent and is trivially adjustable.
 enum DesignSystem {
+    enum Colors {
+        /// Portainer's current default "purple" active brand color from portainer.io.
+        static let accent = Color(red: 192 / 255, green: 128 / 255, blue: 1)
+    }
+
     enum Spacing {
         static let tight: CGFloat = 4
         static let small: CGFloat = 8

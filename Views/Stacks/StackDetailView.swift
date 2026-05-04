@@ -6,6 +6,7 @@ struct StackDetailView: View {
     @State private var viewModel: StacksViewModel
     @State private var isShowingEditor = false
     @State private var pendingDelete = false
+    @State private var pendingStop = false
 
     private let containersClient: PortainerClient
     private let containersEndpointID: Int
@@ -70,6 +71,14 @@ struct StackDetailView: View {
         } message: {
             Text("This removes the stack and its containers. This action cannot be undone.")
         }
+        .alert("Stop stack?", isPresented: $pendingStop) {
+            Button("Cancel", role: .cancel) { }
+            Button("Stop", role: .destructive) {
+                Task { await viewModel.stop(stack) }
+            }
+        } message: {
+            Text("This stops \(stack.name) and all its services.")
+        }
     }
 
     @ToolbarContentBuilder
@@ -78,7 +87,7 @@ struct StackDetailView: View {
             Menu("Actions", systemImage: "ellipsis.circle") {
                 if stack.isActive {
                     Button("Stop stack", systemImage: "stop.fill") {
-                        Task { await viewModel.stop(stack) }
+                        pendingStop = true
                     }
                 } else {
                     Button("Start stack", systemImage: "play.fill") {

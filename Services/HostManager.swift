@@ -22,6 +22,7 @@ final class HostManager {
     /// Cached error from the most recent connection attempt - shown by views as needed.
     var lastError: PortainerError?
     var isPresentingHostEditor = false
+    var editingHost: Host?
 
     private var clients: [UUID: PortainerClient] = [:]
     private let activeHostKey = "com.poole.james.pier.activeHostID"
@@ -40,13 +41,13 @@ final class HostManager {
         }
         let client = try PortainerClient(host: host, allowsInsecureTLS: host.allowsInsecureTLS)
         clients[host.id] = client
-        hostsLogger.debug("Created Portainer client for host \(host.name, privacy: .public) (\(host.id.uuidString, privacy: .public))")
+        hostsLogger.debug("Created Portainer client for host \(host.id.uuidString, privacy: .private(mask: .hash))")
         return client
     }
 
     /// Selects the host as active, reading its endpoint list once to find a default endpoint.
     func setActive(_ host: Host) async {
-        hostsLogger.info("Setting active host to \(host.name, privacy: .public) (\(host.baseURL, privacy: .public))")
+        hostsLogger.info("Setting active host to \(host.id.uuidString, privacy: .private(mask: .hash))")
         activeHostID = host.id
         UserDefaults.standard.set(host.id.uuidString, forKey: activeHostKey)
         await refreshActiveEndpoint(for: host)
@@ -54,7 +55,7 @@ final class HostManager {
 
     /// Removes any cached client / token for a host.
     func forget(_ host: Host) {
-        hostsLogger.info("Forgetting host \(host.name, privacy: .public) (\(host.id.uuidString, privacy: .public))")
+        hostsLogger.info("Forgetting host \(host.id.uuidString, privacy: .private(mask: .hash))")
         clients[host.id] = nil
         try? KeychainService.delete(for: host.id)
         if activeHostID == host.id {
@@ -66,13 +67,13 @@ final class HostManager {
 
     /// Attempts to authenticate a host with a password. Caller is expected to discard the password.
     func authenticate(host: Host, password: String) async throws {
-        hostsLogger.info("Authenticating host \(host.name, privacy: .public)")
+        hostsLogger.info("Authenticating host \(host.id.uuidString, privacy: .private(mask: .hash))")
         let client = try client(for: host)
         try await client.authenticate(password: password)
     }
 
     func invalidateClient(for host: Host) {
-        hostsLogger.debug("Invalidating cached client for host \(host.name, privacy: .public)")
+        hostsLogger.debug("Invalidating cached client for host \(host.id.uuidString, privacy: .private(mask: .hash))")
         clients[host.id] = nil
     }
 
@@ -83,13 +84,13 @@ final class HostManager {
             let endpoints = try await client.listEndpoints()
             self.activeEndpointID = endpoints.first(where: \.isUp)?.id ?? endpoints.first?.id
             self.lastError = nil
-            hostsLogger.info("Resolved active endpoint \(self.activeEndpointID ?? -1) for host \(host.name, privacy: .public)")
+            hostsLogger.info("Resolved active endpoint \(self.activeEndpointID ?? -1) for host \(host.id.uuidString, privacy: .private(mask: .hash))")
         } catch let error as PortainerError {
             self.lastError = error
-            hostsLogger.error("Failed to resolve endpoints for host \(host.name, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            hostsLogger.error("Failed to resolve endpoints for host \(host.id.uuidString, privacy: .private(mask: .hash)): \(error.localizedDescription, privacy: .private)")
         } catch {
             self.lastError = .serverError(code: -1, message: error.localizedDescription)
-            hostsLogger.error("Failed to resolve endpoints for host \(host.name, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            hostsLogger.error("Failed to resolve endpoints for host \(host.id.uuidString, privacy: .private(mask: .hash)): \(error.localizedDescription, privacy: .private)")
         }
     }
 

@@ -28,24 +28,7 @@ struct ContainerDetailView: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
-            .toolbar {
-                #if os(iOS)
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Logs", systemImage: "doc.text") {
-                        isShowingLogs = true
-                    }
-                }
-                #else
-                ToolbarItem(placement: .automatic) {
-                    Button("Logs", systemImage: "doc.text") {
-                        isShowingLogs = true
-                    }
-                }
-                #endif
-            }
-            .safeAreaInset(edge: .bottom) {
-                ContainerActionToolbar(viewModel: viewModel, pendingAction: $pendingDestructiveAction)
-            }
+            .toolbar { actionsMenu }
             .navigationDestination(isPresented: $isShowingLogs) {
                 ContainerLogsView(
                     client: viewModel.portainerClient,
@@ -65,15 +48,62 @@ struct ContainerDetailView: View {
             .refreshable { await viewModel.load() }
     }
 
+    @ToolbarContentBuilder
+    private var actionsMenu: some ToolbarContent {
+        ToolbarItem(placement: toolbarTrailingPlacement) {
+            Menu("Actions", systemImage: "ellipsis.circle") {
+                Button("Logs", systemImage: "doc.text") {
+                    isShowingLogs = true
+                }
+
+                let isRunning = viewModel.detail?.state.running ?? false
+                Divider()
+
+                if isRunning {
+                    Button("Stop", systemImage: "stop.fill") {
+                        pendingDestructiveAction = .stop
+                    }
+
+                    Button("Restart", systemImage: "arrow.clockwise") {
+                        pendingDestructiveAction = .restart
+                    }
+
+                    Button("Kill", systemImage: "bolt.slash.fill") {
+                        pendingDestructiveAction = .kill
+                    }
+                } else {
+                    Button("Start", systemImage: "play.fill") {
+                        Task { await viewModel.start() }
+                    }
+                }
+
+                Divider()
+
+                Button("Delete", systemImage: "trash", role: .destructive) {
+                    pendingDestructiveAction = .delete
+                }
+            }
+            .disabled(viewModel.isPerformingAction)
+        }
+    }
+
+    private var toolbarTrailingPlacement: ToolbarItemPlacement {
+        #if os(iOS)
+        .topBarTrailing
+        #else
+        .automatic
+        #endif
+    }
+
     @ViewBuilder
     private var detailContent: some View {
         if viewModel.detail == nil {
             if viewModel.isLoading {
                 LoadingView(message: "Loading container…")
             } else if let error = viewModel.loadError {
-                ErrorView(error: error) {
+                ErrorView(error: error, retry: {
                     Task { await viewModel.load() }
-                }
+                })
             } else {
                 EmptyStateView(title: "No data", systemImage: "tray")
             }

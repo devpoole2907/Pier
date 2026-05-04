@@ -38,6 +38,11 @@ struct AppRootView: View {
                 HostEditorView(host: nil)
             }
         }
+        .sheet(item: $hostManager.editingHost) { host in
+            NavigationStack {
+                HostEditorView(host: host)
+            }
+        }
     }
 
     /// On launch, if there is no active host yet, pick the first known host and load its endpoint.

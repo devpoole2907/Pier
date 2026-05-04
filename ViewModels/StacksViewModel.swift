@@ -58,9 +58,43 @@ final class StacksViewModel {
         await performAction { try await self.client.deleteStack(stackID: stack.id, endpointID: self.endpointID) }
     }
 
+    func start(_ stacks: [Stack]) async {
+        await performActions(stacks) { stack in
+            try await self.client.startStack(stackID: stack.id, endpointID: self.endpointID)
+        }
+    }
+
+    func stop(_ stacks: [Stack]) async {
+        await performActions(stacks) { stack in
+            try await self.client.stopStack(stackID: stack.id, endpointID: self.endpointID)
+        }
+    }
+
+    func delete(_ stacks: [Stack]) async {
+        await performActions(stacks) { stack in
+            try await self.client.deleteStack(stackID: stack.id, endpointID: self.endpointID)
+        }
+    }
+
     private func performAction(_ body: @escaping @Sendable () async throws -> Void) async {
         do {
             try await body()
+            await load()
+        } catch let error as PortainerError {
+            self.loadError = error
+        } catch {
+            self.loadError = .serverError(code: -1, message: error.localizedDescription)
+        }
+    }
+
+    private func performActions(
+        _ stacks: [Stack],
+        operation: @escaping @Sendable (Stack) async throws -> Void
+    ) async {
+        do {
+            for stack in stacks {
+                try await operation(stack)
+            }
             await load()
         } catch let error as PortainerError {
             self.loadError = error

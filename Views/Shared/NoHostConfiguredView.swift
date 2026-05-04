@@ -20,4 +20,5 @@ struct NoHostConfiguredView: View {
 
 #Preview {
     NoHostConfiguredView()
+        .environment(HostManager())
 }

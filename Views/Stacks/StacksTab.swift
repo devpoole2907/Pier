@@ -10,6 +10,7 @@ struct StacksTab: View {
         NavigationStack {
             StacksContainer()
                 .navigationTitle("Stacks")
+                .hostTitleMenu()
                 .navigationDestination(for: Stack.self) { stack in
                     StackDetailContainer(stack: stack)
                 }
@@ -19,15 +20,10 @@ struct StacksTab: View {
 
 /// Resolves the active host and presents the stacks list, or a no-host placeholder.
 struct StacksContainer: View {
-    @Environment(HostManager.self) private var hostManager
-    @Environment(\.modelContext) private var modelContext
-
     var body: some View {
-        if let active = hostManager.activeClient(in: modelContext) {
-            StacksListView(client: active.client, endpointID: active.endpointID)
-                .id(active.host.id)
-        } else {
-            NoHostConfiguredView()
+        ActiveHostGate { host, client, endpointID in
+            StacksListView(client: client, endpointID: endpointID)
+                .id(host.id)
         }
     }
 }
@@ -35,14 +31,10 @@ struct StacksContainer: View {
 /// Resolves the host and presents the stack detail.
 struct StackDetailContainer: View {
     let stack: Stack
-    @Environment(HostManager.self) private var hostManager
-    @Environment(\.modelContext) private var modelContext
 
     var body: some View {
-        if let active = hostManager.activeClient(in: modelContext) {
-            StackDetailView(stack: stack, client: active.client, endpointID: active.endpointID)
-        } else {
-            EmptyStateView(title: "No active host", systemImage: "externaldrive.badge.questionmark")
+        ActiveHostGate { _, client, endpointID in
+            StackDetailView(stack: stack, client: client, endpointID: endpointID)
         }
     }
 }

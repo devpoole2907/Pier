@@ -7,15 +7,13 @@ struct StatusBadgeView: View {
     let status: ContainerStatus
 
     var body: some View {
-        Label {
+        HStack(spacing: 4) {
+            Image(systemName: status.symbolName)
+                .imageScale(.small)
             Text(status.displayName)
                 .font(.caption)
                 .fontDesign(.rounded)
-        } icon: {
-            Image(systemName: status.symbolName)
-                .imageScale(.small)
         }
-        .labelStyle(.titleAndIcon)
         .foregroundStyle(status.color)
         .padding(.horizontal, DesignSystem.Spacing.small)
         .padding(.vertical, DesignSystem.Spacing.tight)

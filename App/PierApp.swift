@@ -21,11 +21,12 @@ struct PierApp: App {
             AppRootView()
                 .environment(hostManager)
                 .preferredColorScheme(currentTheme.colorScheme)
+                .tint(DesignSystem.Colors.accent)
         }
         .defaultSize(width: 900, height: 600)
         .modelContainer(modelContainer)
         .commands {
-            PierCommands()
+            PierCommands(hostManager: hostManager)
             SidebarCommands()
         }
     }
@@ -36,9 +37,11 @@ struct PierApp: App {
 }
 
 private struct PierCommands: Commands {
-    @Environment(HostManager.self) private var hostManager
+    let hostManager: HostManager
 
     var body: some Commands {
+        @Bindable var hostManager = hostManager
+
         CommandGroup(replacing: .newItem) {
             Button("New Host…") {
                 hostManager.isPresentingHostEditor = true

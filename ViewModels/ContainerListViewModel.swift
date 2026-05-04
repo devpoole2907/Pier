@@ -29,6 +29,7 @@ final class ContainerListViewModel {
 
     var filter: ContainerFilter = .all
     var searchText: String = ""
+    var pendingDestructiveAction: PendingContainerAction?
 
     private let client: PortainerClient
     private let endpointID: Int
@@ -105,26 +106,57 @@ final class ContainerListViewModel {
         await performAction { try await self.client.startContainer(endpointID: self.endpointID, containerID: container.id) }
     }
 
-    func stop(_ container: Container) async {
-        await performAction { try await self.client.stopContainer(endpointID: self.endpointID, containerID: container.id) }
+    func stop(_ container: Container) {
+        pendingDestructiveAction = PendingContainerAction(container: container, action: .stop)
     }
 
-    func restart(_ container: Container) async {
-        await performAction { try await self.client.restartContainer(endpointID: self.endpointID, containerID: container.id) }
+    func restart(_ container: Container) {
+        pendingDestructiveAction = PendingContainerAction(container: container, action: .restart)
     }
 
-    func kill(_ container: Container) async {
-        await performAction { try await self.client.killContainer(endpointID: self.endpointID, containerID: container.id) }
+    func kill(_ container: Container) {
+        pendingDestructiveAction = PendingContainerAction(container: container, action: .kill)
     }
 
-    func delete(_ container: Container, force: Bool = true, removeVolumes: Bool = false) async {
-        await performAction {
-            try await self.client.deleteContainer(
-                endpointID: self.endpointID,
-                containerID: container.id,
-                force: force,
-                removeVolumes: removeVolumes
-            )
+    func delete(_ container: Container) {
+        pendingDestructiveAction = PendingContainerAction(container: container, action: .delete)
+    }
+
+    func confirmDestructiveAction() async {
+        guard let pending = pendingDestructiveAction else { return }
+        pendingDestructiveAction = nil
+        switch pending.action {
+        case .stop:
+            await performAction { try await self.client.stopContainer(endpointID: self.endpointID, containerID: pending.container.id) }
+        case .restart:
+            await performAction { try await self.client.restartContainer(endpointID: self.endpointID, containerID: pending.container.id) }
+        case .kill:
+            await performAction { try await self.client.killContainer(endpointID: self.endpointID, containerID: pending.container.id) }
+        case .delete:
+            await performAction {
+                try await self.client.deleteContainer(endpointID: self.endpointID, containerID: pending.container.id, force: true, removeVolumes: false)
+            }
+        }
+    }
+
+    func start(_ containers: [Container]) async {
+        await performActions(containers) { container in
+            try await self.client.startContainer(endpointID: self.endpointID, containerID: container.id)
+        }
+    }
+
+    func performBulkAction(_ action: DestructiveAction, on containers: [Container]) async {
+        await performActions(containers) { container in
+            switch action {
+            case .stop:
+                try await self.client.stopContainer(endpointID: self.endpointID, containerID: container.id)
+            case .restart:
+                try await self.client.restartContainer(endpointID: self.endpointID, containerID: container.id)
+            case .kill:
+                try await self.client.killContainer(endpointID: self.endpointID, containerID: container.id)
+            case .delete:
+                try await self.client.deleteContainer(endpointID: self.endpointID, containerID: container.id, force: true, removeVolumes: false)
+            }
         }
     }
 
@@ -138,4 +170,27 @@ final class ContainerListViewModel {
             self.loadError = .serverError(code: -1, message: error.localizedDescription)
         }
     }
+
+    private func performActions(
+        _ containers: [Container],
+        operation: @escaping @Sendable (Container) async throws -> Void
+    ) async {
+        do {
+            for container in containers {
+                try await operation(container)
+            }
+            await load()
+        } catch let error as PortainerError {
+            self.loadError = error
+        } catch {
+            self.loadError = .serverError(code: -1, message: error.localizedDescription)
+        }
+    }
+}
+
+struct PendingContainerAction: Identifiable {
+    let container: Container
+    let action: DestructiveAction
+
+    var id: String { "\(container.id)-\(action.rawValue)" }
 }

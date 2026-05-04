@@ -1,21 +1,43 @@
 import Foundation
 import Security
 
-/// Thin wrapper around the iOS Keychain for storing per-host Portainer JWTs.
-///
-/// Tokens are stored under the service identifier `com.poole.james.pier.jwt`,
-/// keyed by the host's UUID string.
+/// Thin wrapper around the iOS Keychain for storing per-host Portainer credentials.
 enum KeychainService {
-    nonisolated private static let service = "com.poole.james.pier.jwt"
+    nonisolated private static let tokenService = "com.poole.james.pier.jwt"
+    nonisolated private static let passwordService = "com.poole.james.pier.password"
 
     /// Stores a token. Replaces any existing entry for the same account.
     nonisolated static func store(token: String, for hostID: UUID) throws {
+        try store(value: token, service: tokenService, for: hostID)
+    }
+
+    /// Retrieves a token, or returns nil if none is stored.
+    nonisolated static func token(for hostID: UUID) throws -> String? {
+        try value(for: hostID, service: tokenService)
+    }
+
+    /// Stores the Portainer password for silent re-auth after app relaunch.
+    nonisolated static func store(password: String, for hostID: UUID) throws {
+        try store(value: password, service: passwordService, for: hostID)
+    }
+
+    /// Retrieves a password, or returns nil if none is stored.
+    nonisolated static func password(for hostID: UUID) throws -> String? {
+        try value(for: hostID, service: passwordService)
+    }
+
+    /// Deletes the stored credentials for a host. Safe to call when nothing is stored.
+    nonisolated static func delete(for hostID: UUID) throws {
+        try deleteValue(for: hostID, service: tokenService)
+        try deleteValue(for: hostID, service: passwordService)
+    }
+
+    private nonisolated static func store(value: String, service: String, for hostID: UUID) throws {
         let account = hostID.uuidString
-        guard let data = token.data(using: .utf8) else {
+        guard let data = value.data(using: .utf8) else {
             throw KeychainError.encodingFailed
         }
 
-        // Delete any existing entry first; SecItemUpdate with attributes is fiddlier than just replacing.
         let deleteQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -36,8 +58,7 @@ enum KeychainService {
         }
     }
 
-    /// Retrieves a token, or returns nil if none is stored.
-    nonisolated static func token(for hostID: UUID) throws -> String? {
+    private nonisolated static func value(for hostID: UUID, service: String) throws -> String? {
         let account = hostID.uuidString
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -61,8 +82,7 @@ enum KeychainService {
         }
     }
 
-    /// Deletes the stored token for a host. Safe to call when nothing is stored.
-    nonisolated static func delete(for hostID: UUID) throws {
+    private nonisolated static func deleteValue(for hostID: UUID, service: String) throws {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
