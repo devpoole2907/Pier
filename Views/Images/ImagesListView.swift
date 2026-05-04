@@ -149,7 +149,7 @@ struct ImagesListView: View {
     private func deleteSelectedImages() async {
         let images = selectedImages
         guard !images.isEmpty else { return }
-        await viewModel.delete(images, force: true)
-        selectedImageIDs.subtract(images.map(\.id))
+        let deletedIDs = await viewModel.delete(images, force: true)
+        selectedImageIDs.subtract(deletedIDs)
     }
 }

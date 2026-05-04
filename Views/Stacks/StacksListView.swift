@@ -136,12 +136,17 @@ struct StacksListView: View {
 
     private func bulkStackAlert(for action: BulkStackAction) -> Alert {
         let count = action.targetStacks(in: selectedStacks).count
+        let primaryButton: Alert.Button = action.isDestructive
+            ? .destructive(Text(action.confirmLabel)) {
+                Task { await confirmBulkAction(action) }
+            }
+            : .default(Text(action.confirmLabel)) {
+                Task { await confirmBulkAction(action) }
+            }
         return Alert(
             title: Text(action.title),
             message: Text(action.message(count: count)),
-            primaryButton: .destructive(Text(action.confirmLabel)) {
-                Task { await confirmBulkAction(action) }
-            },
+            primaryButton: primaryButton,
             secondaryButton: .cancel {
                 pendingBulkAction = nil
             }
@@ -160,7 +165,9 @@ struct StacksListView: View {
         case .delete:
             await viewModel.delete(targets)
         }
-        selectedStackIDs.subtract(targets.map(\.id))
+        if viewModel.loadError == nil {
+            selectedStackIDs.subtract(targets.map(\.id))
+        }
     }
 }
 
@@ -170,6 +177,15 @@ private enum BulkStackAction: String, Identifiable {
     case delete
 
     var id: String { rawValue }
+
+    var isDestructive: Bool {
+        switch self {
+        case .start, .stop:
+            return false
+        case .delete:
+            return true
+        }
+    }
 
     var title: String {
         switch self {

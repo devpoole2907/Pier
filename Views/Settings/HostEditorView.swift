@@ -161,6 +161,7 @@ struct HostEditorView: View {
             && !baseURL.isEmpty
             && !username.isEmpty
             && (existingHost != nil || !password.isEmpty)
+            && connectionTest != .testing
     }
 
     private func validateURL(_ raw: String) -> String? {

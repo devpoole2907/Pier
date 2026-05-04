@@ -35,12 +35,7 @@ struct AppRootView: View {
         }
         .sheet(isPresented: $hostManager.isPresentingHostEditor) {
             NavigationStack {
-                HostEditorView(host: nil)
-            }
-        }
-        .sheet(item: $hostManager.editingHost) { host in
-            NavigationStack {
-                HostEditorView(host: host)
+                HostEditorView(host: hostManager.editingHost)
             }
         }
     }

@@ -153,7 +153,8 @@ struct HostsListView: View {
             modelContext.delete(host)
         }
         try? modelContext.save()
-        selectedHostIDs.subtract(hostsToDelete.map(\.id))
+        editMode = .inactive
+        selectedHostIDs.removeAll()
     }
 
     private func delete(_ host: Host) {
