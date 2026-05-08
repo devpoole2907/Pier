@@ -105,7 +105,7 @@ struct SSHProfileListView: View {
             Spacer()
 
             VStack(alignment: .trailing, spacing: 4) {
-                if sshSessionStore.hasSession, sshSessionStore.activeProfile?.id == profile.id {
+                if sshSessionStore.sessions.contains(where: { $0.profile.id == profile.id && $0.connection.state == .connected }) {
                     HStack(spacing: 2) {
                         Image(systemName: "checkmark.circle.fill")
                         Text("Connected")

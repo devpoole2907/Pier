@@ -97,7 +97,7 @@ final class ContainerListViewModel {
         while !Task.isCancelled {
             try? await Task.sleep(for: .seconds(seconds))
             guard !Task.isCancelled else { return }
-            await load(includeStopped: includeStopped)
+            await load(includeStopped: includesStopped)
         }
     }
 

@@ -8,7 +8,8 @@ final class SSHLiveActivityManager {
     private var activity: Activity<SSHSessionActivityAttributes>?
 
     init() {
-        activity = Activity<SSHSessionActivityAttributes>.activities.first
+        // Don't blindly recover the first activity - wait for sync() to match by profileID
+        activity = nil
     }
 
     func sync(
@@ -18,14 +19,14 @@ final class SSHLiveActivityManager {
         title: String,
         subtitle: String,
         statusText: String
-    ) {
+    ) async {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else {
-            Task { await end() }
+            await end()
             return
         }
 
         guard let profileID else {
-            Task { await end() }
+            await end()
             return
         }
 
@@ -44,26 +45,31 @@ final class SSHLiveActivityManager {
             relevanceScore: 100
         )
 
-        Task {
-            if let activity {
-                if activity.attributes.profileID != attributes.profileID {
-                    await activity.end(nil, dismissalPolicy: .immediate)
-                    self.activity = nil
-                } else {
-                    await activity.update(content)
-                    return
-                }
+        // If no activity, try to recover from existing activities by profileID
+        if activity == nil {
+            activity = Activity<SSHSessionActivityAttributes>.activities.first {
+                $0.attributes.profileID == attributes.profileID
             }
+        }
 
-            do {
-                activity = try Activity.request(
-                    attributes: attributes,
-                    content: content,
-                    pushType: nil
-                )
-            } catch {
-                activity = nil
+        if let activity {
+            if activity.attributes.profileID != attributes.profileID {
+                await activity.end(nil, dismissalPolicy: .immediate)
+                self.activity = nil
+            } else {
+                await activity.update(content)
+                return
             }
+        }
+
+        do {
+            activity = try Activity.request(
+                attributes: attributes,
+                content: content,
+                pushType: nil
+            )
+        } catch {
+            activity = nil
         }
     }
 

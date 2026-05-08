@@ -21,7 +21,11 @@ struct PierApp: App {
     }()
 
     init() {
-        try? Libssh2RuntimeBootstrap.bootstrap()
+        do {
+            try Libssh2RuntimeBootstrap.bootstrap()
+        } catch {
+            fatalError("Libssh2 bootstrap failed: \(error)")
+        }
 
         #if os(iOS)
         BGTaskScheduler.shared.register(
@@ -31,6 +35,12 @@ struct PierApp: App {
             guard let refreshTask = task as? BGAppRefreshTask else {
                 task.setTaskCompleted(success: false)
                 return
+            }
+            // Set expiration handler synchronously before dispatching to service
+            task.expirationHandler = {
+                Task { @MainActor in
+                    await SSHBackgroundService.shared.handleExpiration(refreshTask)
+                }
             }
             Task { @MainActor in
                 SSHBackgroundService.shared.handleBackgroundTask(refreshTask)

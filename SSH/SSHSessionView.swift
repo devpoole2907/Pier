@@ -19,7 +19,7 @@ struct SSHSessionView: View {
         }
         .alert("New Host Fingerprint", isPresented: Binding(
             get: { session.pendingFingerprint != nil },
-            set: { if !$0 { session.confirmFingerprint(accepted: false) } }
+            set: { _ in }
         )) {
             Button("Trust & Connect") { session.confirmFingerprint(accepted: true) }
             Button("Cancel", role: .cancel) { session.confirmFingerprint(accepted: false) }

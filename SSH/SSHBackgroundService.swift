@@ -15,6 +15,7 @@ final class SSHBackgroundService {
     private let logger = Logger(subsystem: "com.poole.james.pier", category: "SSHBackground")
     private var connections: [UUID: SSHConnection] = [:]
     private var liveActivitySync: (() -> Void)?
+    private var taskCompleted = false
 
     private init() {}
 
@@ -44,7 +45,16 @@ final class SSHBackgroundService {
 
     // MARK: - BGTask Handling
 
+    func handleExpiration(_ task: BGAppRefreshTask) async {
+        // Mirror expiration logic - cancel ongoing work and mark as failed
+        if !taskCompleted {
+            taskCompleted = true
+            task.setTaskCompleted(success: false)
+        }
+    }
+
     func handleBackgroundTask(_ task: BGAppRefreshTask) {
+        taskCompleted = false
         scheduleNextTask()
 
         let bgTask = Task { @MainActor in
@@ -59,13 +69,18 @@ final class SSHBackgroundService {
                 }
                 self.logger.info("BGTask: keepalives sent to \(activeConnections.count, privacy: .public) sessions.")
             }
-            self.liveActivitySync?()
-            task.setTaskCompleted(success: true)
+            if !self.taskCompleted {
+                self.taskCompleted = true
+                self.liveActivitySync?()
+                task.setTaskCompleted(success: true)
+            }
         }
 
         task.expirationHandler = {
             bgTask.cancel()
-            task.setTaskCompleted(success: false)
+            Task { @MainActor in
+                await SSHBackgroundService.shared.handleExpiration(task)
+            }
         }
     }
 

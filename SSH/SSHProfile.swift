@@ -55,7 +55,11 @@ final class SSHProfile {
     }
 
     var authType: SSHAuthType {
-        SSHAuthType(rawValue: authTypeRaw) ?? .password
+        guard let type = SSHAuthType(rawValue: authTypeRaw) else {
+            assertionFailure("Invalid authTypeRaw: \(authTypeRaw) for SSHProfile")
+            return .password
+        }
+        return type
     }
 
     /// Formatted host:port string for display

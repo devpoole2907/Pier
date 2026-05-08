@@ -38,8 +38,25 @@ enum KeychainService {
 
     /// Deletes the stored credentials for a host. Safe to call when nothing is stored.
     nonisolated static func delete(for hostID: UUID) throws {
-        try KeychainStore.delete(service: tokenService, account: hostID.uuidString)
-        try KeychainStore.delete(service: passwordService, account: hostID.uuidString)
+        var tokenError: Error?
+        var passwordError: Error?
+
+        do {
+            try KeychainStore.delete(service: tokenService, account: hostID.uuidString)
+        } catch {
+            tokenError = error
+        }
+
+        do {
+            try KeychainStore.delete(service: passwordService, account: hostID.uuidString)
+        } catch {
+            passwordError = error
+        }
+
+        // Throw the first error encountered, if any
+        if let error = tokenError ?? passwordError {
+            throw error
+        }
     }
 }
 

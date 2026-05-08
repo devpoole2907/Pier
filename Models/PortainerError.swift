@@ -15,7 +15,13 @@ enum PortainerError: Error, LocalizedError, Sendable {
         if let portainerError = error as? PortainerError {
             return portainerError
         }
+        if error is CancellationError {
+            return .streamClosed
+        }
         if let urlError = error as? URLError {
+            if urlError.code == .cancelled {
+                return .streamClosed
+            }
             return .network(urlError)
         }
         return .serverError(code: -1, message: error.localizedDescription)

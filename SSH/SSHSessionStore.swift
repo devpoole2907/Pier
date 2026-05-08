@@ -8,7 +8,11 @@ import UIKit
 @Observable
 final class SSHSessionStore {
     private(set) var sessions: [SSHSessionItem] = []
-    var activeSession: SSHSessionItem?
+    var activeSession: SSHSessionItem? {
+        didSet {
+            syncLiveActivity()
+        }
+    }
     private let liveActivityManager = SSHLiveActivityManager()
 
     #if os(iOS)
@@ -71,6 +75,10 @@ final class SSHSessionStore {
                 self.updateBackgroundService()
             case .disconnected, .failed:
                 if let item { SSHBackgroundService.shared.unregister(id: item.id) }
+                // End background task if no sessions are connected
+                if !self.sessions.contains(where: { $0.connection.state == .connected }) {
+                    self.endBackgroundKeepAlive()
+                }
             case .connecting:
                 break
             }
@@ -157,24 +165,28 @@ final class SSHSessionStore {
     #endif
 
     func syncLiveActivity() {
-        guard let rep = activeSession ?? sessions.first else {
-            liveActivityManager.sync(
-                sessionCount: 0,
-                profileID: nil,
-                hostDisplay: "",
-                title: "SSH",
-                subtitle: "No Active Session",
-                statusText: "Disconnected"
+        // Spawn a task to call the async sync method
+        // The async nature of sync() prevents concurrent interleaving
+        Task {
+            guard let rep = activeSession ?? sessions.first else {
+                await liveActivityManager.sync(
+                    sessionCount: 0,
+                    profileID: nil,
+                    hostDisplay: "",
+                    title: "SSH",
+                    subtitle: "No Active Session",
+                    statusText: "Disconnected"
+                )
+                return
+            }
+            await liveActivityManager.sync(
+                sessionCount: sessions.count,
+                profileID: rep.profile.id.uuidString,
+                hostDisplay: rep.profile.hostDisplay,
+                title: sessionTitle,
+                subtitle: sessionSubtitle,
+                statusText: statusText
             )
-            return
         }
-        liveActivityManager.sync(
-            sessionCount: sessions.count,
-            profileID: rep.profile.id.uuidString,
-            hostDisplay: rep.profile.hostDisplay,
-            title: sessionTitle,
-            subtitle: sessionSubtitle,
-            statusText: statusText
-        )
     }
 }

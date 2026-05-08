@@ -91,6 +91,7 @@ final class StacksViewModel {
             }
             await load()
         } catch {
+            await load()
             self.loadError = PortainerError.from(error)
         }
     }

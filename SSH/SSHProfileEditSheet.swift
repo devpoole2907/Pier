@@ -294,6 +294,9 @@ struct SSHProfileEditSheet: View {
             : displayName.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if let existing {
+            // Close any active sessions for this profile before editing
+            await sshSessionStore.closeSessions(for: existing.id)
+
             let previousDisplayName = existing.displayName
             let previousHost = existing.host
             let previousPort = existing.port
@@ -384,8 +387,7 @@ struct SSHProfileEditSheet: View {
     private func delete() async {
         guard let profile = existing else { return }
 
-        await sshSessionStore.closeSessions(for: profile.id)
-
+        // Snapshot credentials first
         let credentialSnapshot: SSHCredentialSnapshot
         do {
             credentialSnapshot = try await credentialStore.snapshotCredentials(for: profile)
@@ -394,10 +396,14 @@ struct SSHProfileEditSheet: View {
             return
         }
 
+        // Perform deletions
         do {
             try await credentialStore.clearCredentials(for: profile)
             modelContext.delete(profile)
             try modelContext.save()
+
+            // Only tear down sessions after successful delete
+            await sshSessionStore.closeSessions(for: profile.id)
 
             dismiss()
         } catch let deleteFailure {

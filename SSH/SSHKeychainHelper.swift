@@ -11,7 +11,7 @@ actor KeychainHelper {
             value: value,
             service: service,
             account: key,
-            accessibility: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            accessibility: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         )
     }
 
