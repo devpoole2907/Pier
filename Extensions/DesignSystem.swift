@@ -34,3 +34,31 @@ enum DesignSystem {
         static let maxLogLines = 5_000
     }
 }
+
+extension ToolbarItemPlacement {
+    static var platformLeading: ToolbarItemPlacement {
+        #if os(iOS)
+        .topBarLeading
+        #else
+        .automatic
+        #endif
+    }
+
+    static var platformTrailing: ToolbarItemPlacement {
+        #if os(iOS)
+        .topBarTrailing
+        #else
+        .automatic
+        #endif
+    }
+}
+
+extension Set {
+    mutating func toggleMembership(of element: Element) {
+        if contains(element) {
+            remove(element)
+        } else {
+            insert(element)
+        }
+    }
+}

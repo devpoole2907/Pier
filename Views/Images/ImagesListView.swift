@@ -40,16 +40,11 @@ struct ImagesListView: View {
                 }
             }
         }
+        .environment(\.editMode, $editMode)
         .searchable(text: $viewModel.searchText, prompt: "Search images")
         .refreshable { await viewModel.load() }
         .toolbar { imagesToolbar }
         .navigationSubtitle(navigationSubtitleText)
-        .environment(\.editMode, $editMode)
-        .onChange(of: editMode) { _, mode in
-            if mode == .inactive {
-                selectedImageIDs.removeAll()
-            }
-        }
         .alert("Delete selected images?", isPresented: $isShowingBulkDeleteAlert) {
             Button("Delete", role: .destructive) {
                 Task { await deleteSelectedImages() }
@@ -78,12 +73,29 @@ struct ImagesListView: View {
 
     @ToolbarContentBuilder
     private var imagesToolbar: some ToolbarContent {
-        ToolbarItem(placement: toolbarLeadingPlacement) {
-            if !viewModel.visibleImages.isEmpty {
-                EditButton()
+        if !viewModel.visibleImages.isEmpty {
+            ToolbarItem(placement: .platformTrailing) {
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        editMode = isSelecting ? .inactive : .active
+                    }
+                    if !editMode.isEditing {
+                        selectedImageIDs.removeAll()
+                    }
+                } label: {
+                    if isSelecting {
+                        Image(systemName: "xmark")
+                            .accessibilityLabel("Done")
+                    } else {
+                        Text("Select")
+                    }
+                }
             }
+
+            ToolbarSpacer(.fixed, placement: .platformTrailing)
         }
-        ToolbarItem(placement: toolbarTrailingPlacement) {
+
+        ToolbarItem(placement: .platformTrailing) {
             if isSelecting {
                 Button("Delete selected", systemImage: "trash") {
                     isShowingBulkDeleteAlert = true
@@ -97,32 +109,16 @@ struct ImagesListView: View {
         }
     }
 
-    private var toolbarTrailingPlacement: ToolbarItemPlacement {
-        #if os(iOS)
-        .topBarTrailing
-        #else
-        .automatic
-        #endif
-    }
-
-    private var toolbarLeadingPlacement: ToolbarItemPlacement {
-        #if os(iOS)
-        .topBarLeading
-        #else
-        .automatic
-        #endif
-    }
-
-    private var isSelecting: Bool {
-        editMode.isEditing
-    }
-
     private var selectedImages: [DockerImage] {
         viewModel.visibleImages.filter { selectedImageIDs.contains($0.id) }
     }
 
     private var selectionSubtitle: String? {
         selectedImageIDs.isEmpty ? nil : "\(selectedImageIDs.count) selected"
+    }
+
+    private var isSelecting: Bool {
+        editMode.isEditing
     }
 
     private var activeHostName: String? {
@@ -135,15 +131,18 @@ struct ImagesListView: View {
 
     @ViewBuilder
     private func row(for image: DockerImage) -> some View {
-        ImageRowView(image: image)
+        if isSelecting {
+            ImageRowView(image: image)
             .tag(image.id)
-            .swipeActions(edge: .trailing) {
-                if !isSelecting {
+        } else {
+            ImageRowView(image: image)
+                .tag(image.id)
+                .swipeActions(edge: .trailing) {
                     Button("Delete", systemImage: "trash", role: .destructive) {
                         pendingDelete = image
                     }
                 }
-            }
+        }
     }
 
     private func deleteSelectedImages() async {
@@ -152,4 +151,5 @@ struct ImagesListView: View {
         let deletedIDs = await viewModel.delete(images, force: true)
         selectedImageIDs.subtract(deletedIDs)
     }
+
 }

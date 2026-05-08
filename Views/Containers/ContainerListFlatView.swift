@@ -32,18 +32,10 @@ struct ContainerListFlatView: View {
 
     @ViewBuilder
     private func row(for container: Container) -> some View {
-        if isSelecting {
-            ContainerRowView(container: container)
-                .tag(container.id)
-        } else {
-            NavigationLink(value: ContainerNavigationValue(containerID: container.id, displayName: container.displayName)) {
-                ContainerRowView(container: container)
-            }
-            .tag(container.id)
-            .swipeActions(edge: .trailing) {
-                ContainerSwipeActions(container: container, viewModel: viewModel)
-            }
-            .contextMenu { ContainerContextMenu(container: container, viewModel: viewModel) }
-        }
+        SelectableContainerRow(
+            container: container,
+            viewModel: viewModel,
+            isSelecting: isSelecting
+        )
     }
 }

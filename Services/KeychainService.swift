@@ -8,32 +8,43 @@ enum KeychainService {
 
     /// Stores a token. Replaces any existing entry for the same account.
     nonisolated static func store(token: String, for hostID: UUID) throws {
-        try store(value: token, service: tokenService, for: hostID)
+        try KeychainStore.store(
+            value: token,
+            service: tokenService,
+            account: hostID.uuidString,
+            accessibility: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        )
     }
 
     /// Retrieves a token, or returns nil if none is stored.
     nonisolated static func token(for hostID: UUID) throws -> String? {
-        try value(for: hostID, service: tokenService)
+        try KeychainStore.value(service: tokenService, account: hostID.uuidString)
     }
 
     /// Stores the Portainer password for silent re-auth after app relaunch.
     nonisolated static func store(password: String, for hostID: UUID) throws {
-        try store(value: password, service: passwordService, for: hostID)
+        try KeychainStore.store(
+            value: password,
+            service: passwordService,
+            account: hostID.uuidString,
+            accessibility: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        )
     }
 
     /// Retrieves a password, or returns nil if none is stored.
     nonisolated static func password(for hostID: UUID) throws -> String? {
-        try value(for: hostID, service: passwordService)
+        try KeychainStore.value(service: passwordService, account: hostID.uuidString)
     }
 
     /// Deletes the stored credentials for a host. Safe to call when nothing is stored.
     nonisolated static func delete(for hostID: UUID) throws {
-        try deleteValue(for: hostID, service: tokenService)
-        try deleteValue(for: hostID, service: passwordService)
+        try KeychainStore.delete(service: tokenService, account: hostID.uuidString)
+        try KeychainStore.delete(service: passwordService, account: hostID.uuidString)
     }
+}
 
-    private nonisolated static func store(value: String, service: String, for hostID: UUID) throws {
-        let account = hostID.uuidString
+enum KeychainStore {
+    nonisolated static func store(value: String, service: String, account: String, accessibility: CFString) throws {
         guard let data = value.data(using: .utf8) else {
             throw KeychainError.encodingFailed
         }
@@ -50,7 +61,7 @@ enum KeychainService {
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
             kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            kSecAttrAccessible as String: accessibility
         ]
         let status = SecItemAdd(addQuery as CFDictionary, nil)
         guard status == errSecSuccess else {
@@ -58,8 +69,7 @@ enum KeychainService {
         }
     }
 
-    private nonisolated static func value(for hostID: UUID, service: String) throws -> String? {
-        let account = hostID.uuidString
+    nonisolated static func value(service: String, account: String) throws -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -82,11 +92,11 @@ enum KeychainService {
         }
     }
 
-    private nonisolated static func deleteValue(for hostID: UUID, service: String) throws {
+    nonisolated static func delete(service: String, account: String) throws {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: hostID.uuidString
+            kSecAttrAccount as String: account
         ]
         let status = SecItemDelete(query as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else {

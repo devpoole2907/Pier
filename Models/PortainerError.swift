@@ -11,6 +11,16 @@ enum PortainerError: Error, LocalizedError, Sendable {
     case missingCredentials
     case streamClosed
 
+    static func from(_ error: Error) -> PortainerError {
+        if let portainerError = error as? PortainerError {
+            return portainerError
+        }
+        if let urlError = error as? URLError {
+            return .network(urlError)
+        }
+        return .serverError(code: -1, message: error.localizedDescription)
+    }
+
     var errorDescription: String? {
         switch self {
         case .invalidURL:

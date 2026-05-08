@@ -6,8 +6,11 @@ import SwiftData
 /// modern Tab API.
 struct AppRootView: View {
     @Environment(HostManager.self) private var hostManager
+    @Environment(SSHSessionStore.self) private var sshSessionStore
     @Query(sort: \Host.createdAt) private var hosts: [Host]
     @State private var selection: AppDestination = .containers
+    @State private var isShowingSSHSession = false
+    @State private var isShowingCloseSSHConfirm = false
 
     var body: some View {
         @Bindable var hostManager = hostManager
@@ -19,17 +22,42 @@ struct AppRootView: View {
             Tab(AppDestination.stacks.displayName, systemImage: AppDestination.stacks.systemImage, value: .stacks) {
                 StacksTab()
             }
-            Tab(AppDestination.images.displayName, systemImage: AppDestination.images.systemImage, value: .images) {
-                ImagesTab()
-            }
             Tab(AppDestination.stats.displayName, systemImage: AppDestination.stats.systemImage, value: .stats) {
                 StatsTab()
             }
-            Tab(AppDestination.settings.displayName, systemImage: AppDestination.settings.systemImage, value: .settings) {
-                SettingsTab()
+            Tab(AppDestination.more.displayName, systemImage: AppDestination.more.systemImage, value: .more) {
+                MoreTab()
             }
         }
         .tabViewStyle(.sidebarAdaptable)
+        #if os(iOS)
+        .tabBarMinimizeBehavior(.onScrollDown)
+        #endif
+        .tabViewBottomAccessory(isEnabled: sshSessionStore.hasSession) {
+            SSHSessionAccessoryView(
+                title: sshSessionStore.sessionTitle,
+                subtitle: sshSessionStore.sessionSubtitle,
+                statusText: sshSessionStore.statusText,
+                statusColor: sshSessionStore.statusColor,
+                openSession: { isShowingSSHSession = true },
+                closeSession: {
+                    isShowingCloseSSHConfirm = true
+                }
+            )
+        }
+        .alert(
+            "Close SSH sessions?",
+            isPresented: $isShowingCloseSSHConfirm,
+        ) {
+            Button("Close", role: .destructive) {
+                Task {
+                    await sshSessionStore.disconnect(animated: true)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(closeSSHConfirmationMessage)
+        }
         .task(id: hosts.map(\.id)) {
             await ensureActiveHost()
         }
@@ -37,6 +65,22 @@ struct AppRootView: View {
             NavigationStack {
                 HostEditorView(host: hostManager.editingHost)
             }
+        }
+        .sshSessionSheet(isPresented: $isShowingSSHSession)
+        .onOpenURL { url in
+            guard url.scheme?.lowercased() == "pier",
+                  url.host?.lowercased() == "ssh-session",
+                  sshSessionStore.hasSession else { return }
+            if let requestedProfileID = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?
+                .first(where: { $0.name == "profile" })?
+                .value,
+               sshSessionStore.activeProfile?.id.uuidString != requestedProfileID {
+                return
+            }
+            selection = .more
+            sshSessionStore.focusSession()
+            isShowingSSHSession = true
         }
     }
 
@@ -55,5 +99,12 @@ struct AppRootView: View {
                   hostManager.activeEndpointID == nil {
             await hostManager.refreshActiveEndpoint(for: host)
         }
+    }
+
+    private var closeSSHConfirmationMessage: String {
+        if sshSessionStore.sessions.count > 1 {
+            return "All \(sshSessionStore.sessions.count) terminal sessions will be disconnected."
+        }
+        return "\(sshSessionStore.sessionTitle) will be disconnected."
     }
 }

@@ -26,10 +26,8 @@ final class StacksViewModel {
                 $0.name.localizedStandardCompare($1.name) == .orderedAscending
             }
             self.loadError = nil
-        } catch let error as PortainerError {
-            self.loadError = error
         } catch {
-            self.loadError = .serverError(code: -1, message: error.localizedDescription)
+            self.loadError = PortainerError.from(error)
         }
     }
 
@@ -39,10 +37,8 @@ final class StacksViewModel {
         do {
             self.fileContent = try await client.stackFile(stackID: stack.id)
             self.loadError = nil
-        } catch let error as PortainerError {
-            self.loadError = error
         } catch {
-            self.loadError = .serverError(code: -1, message: error.localizedDescription)
+            self.loadError = PortainerError.from(error)
         }
     }
 
@@ -80,10 +76,8 @@ final class StacksViewModel {
         do {
             try await body()
             await load()
-        } catch let error as PortainerError {
-            self.loadError = error
         } catch {
-            self.loadError = .serverError(code: -1, message: error.localizedDescription)
+            self.loadError = PortainerError.from(error)
         }
     }
 
@@ -96,10 +90,8 @@ final class StacksViewModel {
                 try await operation(stack)
             }
             await load()
-        } catch let error as PortainerError {
-            self.loadError = error
         } catch {
-            self.loadError = .serverError(code: -1, message: error.localizedDescription)
+            self.loadError = PortainerError.from(error)
         }
     }
 }

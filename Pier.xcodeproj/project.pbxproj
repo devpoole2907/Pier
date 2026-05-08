@@ -6,9 +6,50 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		AA100001AA100001AA100001 /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = AA900003AA900003AA900003 /* SwiftTerm */; };
+		AA100002AA100002AA100002 /* CSSH in Frameworks */ = {isa = PBXBuildFile; productRef = AA900004AA900004AA900004 /* CSSH */; };
+		AA200001AA200001AA200001 /* SSHLiveActivity.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = AA300001AA300001AA300001 /* SSHLiveActivity.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		AA600001AA600001AA600001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7C3AD2D22FA6E0250023FEF8 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AA700001AA700001AA700001;
+			remoteInfo = SSHLiveActivity;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		AA500001AA500001AA500001 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				AA200001AA200001AA200001 /* SSHLiveActivity.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		7C3AD2DA2FA6E0250023FEF8 /* Pier.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Pier.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA300001AA300001AA300001 /* SSHLiveActivity.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SSHLiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		AA400002AA400002AA400002 /* Exceptions for "PierLiveActivity" folder in "SSHLiveActivity" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = AA700001AA700001AA700001 /* SSHLiveActivity */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		7C3AD2DC2FA6E0250023FEF8 /* Pier */ = {
@@ -46,10 +87,32 @@
 			path = Views;
 			sourceTree = "<group>";
 		};
+		AA400001AA400001AA400001 /* PierLiveActivity */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				AA400002AA400002AA400002 /* Exceptions for "PierLiveActivity" folder in "SSHLiveActivity" target */,
+			);
+			path = PierLiveActivity;
+			sourceTree = "<group>";
+		};
+		AA400003AA400003AA400003 /* SSH */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SSH;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		7C3AD2D72FA6E0250023FEF8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA100001AA100001AA100001 /* SwiftTerm in Frameworks */,
+				AA100002AA100002AA100002 /* CSSH in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA700003AA700003AA700003 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -69,6 +132,8 @@
 				7C3AD2F02FA6E0260023FEF8 /* Services */,
 				7C3AD2F12FA6E0260023FEF8 /* ViewModels */,
 				7C3AD2F22FA6E0260023FEF8 /* Views */,
+				AA400003AA400003AA400003 /* SSH */,
+				AA400001AA400001AA400001 /* PierLiveActivity */,
 				7C3AD2DB2FA6E0250023FEF8 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -77,6 +142,7 @@
 			isa = PBXGroup;
 			children = (
 				7C3AD2DA2FA6E0250023FEF8 /* Pier.app */,
+				AA300001AA300001AA300001 /* SSHLiveActivity.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -91,10 +157,12 @@
 				7C3AD2D62FA6E0250023FEF8 /* Sources */,
 				7C3AD2D72FA6E0250023FEF8 /* Frameworks */,
 				7C3AD2D82FA6E0250023FEF8 /* Resources */,
+				AA500001AA500001AA500001 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				AA600002AA600002AA600002 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				7C3AD2DC2FA6E0250023FEF8 /* Pier */,
@@ -104,13 +172,38 @@
 				7C3AD2F02FA6E0260023FEF8 /* Services */,
 				7C3AD2F12FA6E0260023FEF8 /* ViewModels */,
 				7C3AD2F22FA6E0260023FEF8 /* Views */,
+				AA400003AA400003AA400003 /* SSH */,
 			);
 			name = Pier;
 			packageProductDependencies = (
+				AA900003AA900003AA900003 /* SwiftTerm */,
+				AA900004AA900004AA900004 /* CSSH */,
 			);
 			productName = Pier;
 			productReference = 7C3AD2DA2FA6E0250023FEF8 /* Pier.app */;
 			productType = "com.apple.product-type.application";
+		};
+		AA700001AA700001AA700001 /* SSHLiveActivity */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA800003AA800003AA800003 /* Build configuration list for PBXNativeTarget "SSHLiveActivity" */;
+			buildPhases = (
+				AA700002AA700002AA700002 /* Sources */,
+				AA700003AA700003AA700003 /* Frameworks */,
+				AA700004AA700004AA700004 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				AA400001AA400001AA400001 /* PierLiveActivity */,
+			);
+			name = SSHLiveActivity;
+			packageProductDependencies = (
+			);
+			productName = SSHLiveActivity;
+			productReference = AA300001AA300001AA300001 /* SSHLiveActivity.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -125,6 +218,9 @@
 					7C3AD2D92FA6E0250023FEF8 = {
 						CreatedOnToolsVersion = 26.4.1;
 					};
+					AA700001AA700001AA700001 = {
+						CreatedOnToolsVersion = 26.4.1;
+					};
 				};
 			};
 			buildConfigurationList = 7C3AD2D52FA6E0250023FEF8 /* Build configuration list for PBXProject "Pier" */;
@@ -136,18 +232,30 @@
 			);
 			mainGroup = 7C3AD2D12FA6E0250023FEF8;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				AA900001AA900001AA900001 /* XCRemoteSwiftPackageReference "SwiftTerm" */,
+				AA900002AA900002AA900002 /* XCRemoteSwiftPackageReference "Libssh2Prebuild" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7C3AD2DB2FA6E0250023FEF8 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				7C3AD2D92FA6E0250023FEF8 /* Pier */,
+				AA700001AA700001AA700001 /* SSHLiveActivity */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		7C3AD2D82FA6E0250023FEF8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA700004AA700004AA700004 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -164,7 +272,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA700002AA700002AA700002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		AA600002AA600002AA600002 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AA700001AA700001AA700001 /* SSHLiveActivity */;
+			targetProxy = AA600001AA600001AA600001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		7C3AD2E32FA6E0260023FEF8 /* Debug */ = {
@@ -355,6 +478,64 @@
 			};
 			name = Release;
 		};
+		AA800001AA800001AA800001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L9DB7QA9DE;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PierLiveActivity/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.poole.james.pier.SSHLiveActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		AA800002AA800002AA800002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L9DB7QA9DE;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PierLiveActivity/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.poole.james.pier.SSHLiveActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -376,7 +557,48 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		AA800003AA800003AA800003 /* Build configuration list for PBXNativeTarget "SSHLiveActivity" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA800001AA800001AA800001 /* Debug */,
+				AA800002AA800002AA800002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		AA900001AA900001AA900001 /* XCRemoteSwiftPackageReference "SwiftTerm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/migueldeicaza/SwiftTerm";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.5.0;
+			};
+		};
+		AA900002AA900002AA900002 /* XCRemoteSwiftPackageReference "Libssh2Prebuild" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/migueldeicaza/Libssh2Prebuild";
+			requirement = {
+				kind = revision;
+				revision = 242b5e3746076f93a284df21a2af4567fcae094a;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		AA900003AA900003AA900003 /* SwiftTerm */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA900001AA900001AA900001 /* XCRemoteSwiftPackageReference "SwiftTerm" */;
+			productName = SwiftTerm;
+		};
+		AA900004AA900004AA900004 /* CSSH */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA900002AA900002AA900002 /* XCRemoteSwiftPackageReference "Libssh2Prebuild" */;
+			productName = CSSH;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 7C3AD2D22FA6E0250023FEF8 /* Project object */;
 }

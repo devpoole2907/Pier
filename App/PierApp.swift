@@ -1,14 +1,18 @@
 import SwiftUI
 import SwiftData
+#if os(iOS)
+import BackgroundTasks
+#endif
 
 @main
 struct PierApp: App {
     @State private var hostManager = HostManager()
+    @State private var sshSessionStore = SSHSessionStore()
     @AppStorage("themePreference") private var themeRawValue: String = AppTheme.system.rawValue
 
     private let modelContainer: ModelContainer = {
         do {
-            let schema = Schema([Host.self])
+            let schema = Schema([Host.self, SSHProfile.self])
             let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
             return try ModelContainer(for: schema, configurations: [configuration])
         } catch {
@@ -16,10 +20,30 @@ struct PierApp: App {
         }
     }()
 
+    init() {
+        try? Libssh2RuntimeBootstrap.bootstrap()
+
+        #if os(iOS)
+        BGTaskScheduler.shared.register(
+            forTaskWithIdentifier: SSHBackgroundService.taskIdentifier,
+            using: nil
+        ) { task in
+            guard let refreshTask = task as? BGAppRefreshTask else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            Task { @MainActor in
+                SSHBackgroundService.shared.handleBackgroundTask(refreshTask)
+            }
+        }
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
             AppRootView()
                 .environment(hostManager)
+                .environment(sshSessionStore)
                 .preferredColorScheme(currentTheme.colorScheme)
                 .tint(DesignSystem.Colors.accent)
         }

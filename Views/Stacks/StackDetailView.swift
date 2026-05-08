@@ -83,7 +83,7 @@ struct StackDetailView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: toolbarTrailingPlacement) {
+        ToolbarItem(placement: .platformTrailing) {
             Menu("Actions", systemImage: "ellipsis.circle") {
                 if stack.isActive {
                     Button("Stop stack", systemImage: "stop.fill") {
@@ -101,11 +101,4 @@ struct StackDetailView: View {
         }
     }
 
-    private var toolbarTrailingPlacement: ToolbarItemPlacement {
-        #if os(iOS)
-        .topBarTrailing
-        #else
-        .automatic
-        #endif
-    }
 }

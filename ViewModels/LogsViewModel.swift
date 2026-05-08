@@ -43,10 +43,8 @@ final class LogsViewModel {
                 .map { String($0) }
                 .map { LogLine(number: nextNumber(), text: $0) }
             self.loadError = nil
-        } catch let error as PortainerError {
-            self.loadError = error
         } catch {
-            self.loadError = .serverError(code: -1, message: error.localizedDescription)
+            self.loadError = PortainerError.from(error)
         }
     }
 
@@ -66,10 +64,8 @@ final class LogsViewModel {
                     guard let self else { return }
                     self.appendChunk(chunk)
                 }
-            } catch let error as PortainerError {
-                self?.loadError = error
             } catch {
-                self?.loadError = .serverError(code: -1, message: error.localizedDescription)
+                self?.loadError = PortainerError.from(error)
             }
             self?.isFollowing = false
         }

@@ -12,7 +12,9 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("Hosts") {
-                NavigationLink(value: SettingsRoute.hostsList) {
+                NavigationLink {
+                    HostsListView()
+                } label: {
                     LabeledContent {
                         Text(activeHostName)
                             .foregroundStyle(.secondary)
@@ -57,12 +59,6 @@ struct SettingsView: View {
                 }
             }
         }
-        .navigationDestination(for: SettingsRoute.self) { route in
-            switch route {
-            case .hostsList:
-                HostsListView()
-            }
-        }
     }
 
     private var versionString: String {
@@ -79,9 +75,4 @@ struct SettingsView: View {
         }
         return activeHost.name
     }
-}
-
-/// Routes used by the Settings navigation stack.
-enum SettingsRoute: Hashable {
-    case hostsList
 }

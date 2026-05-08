@@ -50,7 +50,7 @@ struct ContainerDetailView: View {
 
     @ToolbarContentBuilder
     private var actionsMenu: some ToolbarContent {
-        ToolbarItem(placement: toolbarTrailingPlacement) {
+        ToolbarItem(placement: .platformTrailing) {
             Menu("Actions", systemImage: "ellipsis.circle") {
                 Button("Logs", systemImage: "doc.text") {
                     isShowingLogs = true
@@ -85,14 +85,6 @@ struct ContainerDetailView: View {
             }
             .disabled(viewModel.isPerformingAction)
         }
-    }
-
-    private var toolbarTrailingPlacement: ToolbarItemPlacement {
-        #if os(iOS)
-        .topBarTrailing
-        #else
-        .automatic
-        #endif
     }
 
     @ViewBuilder

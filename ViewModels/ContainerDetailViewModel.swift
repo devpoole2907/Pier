@@ -39,10 +39,8 @@ final class ContainerDetailViewModel {
         do {
             self.detail = try await client.inspectContainer(endpointID: endpointID, containerID: containerID)
             self.loadError = nil
-        } catch let error as PortainerError {
-            self.loadError = error
         } catch {
-            self.loadError = .serverError(code: -1, message: error.localizedDescription)
+            self.loadError = PortainerError.from(error)
         }
     }
 
@@ -68,10 +66,8 @@ final class ContainerDetailViewModel {
             try await body()
             self.actionError = nil
             await load()
-        } catch let error as PortainerError {
-            self.actionError = error
         } catch {
-            self.actionError = .serverError(code: -1, message: error.localizedDescription)
+            self.actionError = PortainerError.from(error)
         }
     }
 

@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-/// A saved Portainer host. The JWT itself lives in the Keychain, keyed by `id`.
+/// A saved Portainer host. Credentials live in the Keychain, keyed by `id`.
 @Model
 final class Host {
     /// Stable identifier used as the Keychain account key for the JWT.
@@ -13,7 +13,7 @@ final class Host {
     /// Base URL of the Portainer instance, e.g. https://10.0.0.5:9443
     var baseURL: String = ""
 
-    /// Username for authentication. The password is never persisted; we obtain a JWT once and cache it in the Keychain.
+    /// Username for authentication. JWT and optional password re-auth credentials are stored in the Keychain.
     var username: String = ""
 
     /// Whether HTTPS certificate validation should be skipped. Some self-signed local Portainer installs need this.

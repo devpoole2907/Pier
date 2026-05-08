@@ -4,37 +4,47 @@ import SwiftUI
 struct HostRowView: View {
     let host: Host
     let isActive: Bool
-    let activate: () -> Void
+    let activate: (() -> Void)?
 
     var body: some View {
-        Button(action: activate) {
-            HStack(spacing: DesignSystem.Spacing.medium) {
-                Image(systemName: "externaldrive.fill")
-                    .imageScale(.large)
-                    .foregroundStyle(isActive ? Color.accentColor : .secondary)
-                    .frame(width: 32)
-                VStack(alignment: .leading, spacing: DesignSystem.Spacing.tight) {
-                    Text(host.name)
-                        .font(.body)
-                        .foregroundStyle(.primary)
-                    Text(host.baseURL)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+        Group {
+            if let activate {
+                Button(action: activate) {
+                    rowContent
                 }
-                Spacer()
-                if isActive {
-                    Image(systemName: "checkmark")
-                        .foregroundStyle(.tint)
-                        .accessibilityHidden(true)
-                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Activates this host")
+            } else {
+                rowContent
             }
-            .contentShape(.rect)
         }
-        .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(host.name)\(isActive ? ", active" : "")")
-        .accessibilityHint("Activates this host")
+    }
+
+    private var rowContent: some View {
+        HStack(spacing: DesignSystem.Spacing.medium) {
+            Image(systemName: "externaldrive.fill")
+                .imageScale(.large)
+                .foregroundStyle(isActive ? Color.accentColor : .secondary)
+                .frame(width: 32)
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.tight) {
+                Text(host.name)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                Text(host.baseURL)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            Spacer()
+            if isActive {
+                Image(systemName: "checkmark")
+                    .foregroundStyle(.tint)
+                    .accessibilityHidden(true)
+            }
+        }
+        .contentShape(.rect)
     }
 }

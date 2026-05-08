@@ -80,13 +80,12 @@ final class DashboardViewModel {
             recomputeTops()
         } catch is CancellationError {
             return
-        } catch let error as PortainerError {
-            if case .network(let urlError) = error, urlError.code == .cancelled {
+        } catch {
+            let portainerError = PortainerError.from(error)
+            if case .network(let urlError) = portainerError, urlError.code == .cancelled {
                 return
             }
-            self.loadError = error
-        } catch {
-            self.loadError = .serverError(code: -1, message: error.localizedDescription)
+            self.loadError = portainerError
         }
     }
 

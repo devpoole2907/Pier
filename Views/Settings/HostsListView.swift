@@ -28,21 +28,33 @@ struct HostsListView: View {
                 }
             }
         }
+        .environment(\.editMode, $editMode)
         .navigationTitle("Hosts")
         .navigationSubtitle(navigationSubtitleText)
-        .environment(\.editMode, $editMode)
-        .onChange(of: editMode) { _, mode in
-            if mode == .inactive {
-                selectedHostIDs.removeAll()
-            }
-        }
         .toolbar {
-            ToolbarItem(placement: toolbarLeadingPlacement) {
-                if !hosts.isEmpty {
-                    EditButton()
+            if !hosts.isEmpty {
+                ToolbarItem(placement: .platformTrailing) {
+                    Button {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            editMode = isSelecting ? .inactive : .active
+                        }
+                        if !editMode.isEditing {
+                            selectedHostIDs.removeAll()
+                        }
+                    } label: {
+                        if isSelecting {
+                            Image(systemName: "xmark")
+                                .accessibilityLabel("Done")
+                        } else {
+                            Text("Select")
+                        }
+                    }
                 }
+
+                ToolbarSpacer(.fixed, placement: .platformTrailing)
             }
-            ToolbarItem(placement: toolbarTrailingPlacement) {
+
+            ToolbarItem(placement: .platformTrailing) {
                 if isSelecting {
                     Button("Delete selected", systemImage: "trash") {
                         isShowingBulkDeleteAlert = true
@@ -91,7 +103,7 @@ struct HostsListView: View {
     @ViewBuilder
     private func row(for host: Host) -> some View {
         if isSelecting {
-            HostRowView(host: host, isActive: host.id == hostManager.activeHostID) { }
+            HostRowView(host: host, isActive: host.id == hostManager.activeHostID, activate: nil)
                 .tag(host.id)
         } else {
             HostRowView(host: host, isActive: host.id == hostManager.activeHostID) {
@@ -110,12 +122,12 @@ struct HostsListView: View {
         }
     }
 
-    private var isSelecting: Bool {
-        editMode.isEditing
-    }
-
     private var selectedHosts: [Host] {
         hosts.filter { selectedHostIDs.contains($0.id) }
+    }
+
+    private var isSelecting: Bool {
+        editMode.isEditing
     }
 
     private var selectionSubtitle: String? {
@@ -130,22 +142,6 @@ struct HostsListView: View {
         selectionSubtitle ?? activeHostName ?? ""
     }
 
-    private var toolbarLeadingPlacement: ToolbarItemPlacement {
-        #if os(iOS)
-        .topBarLeading
-        #else
-        .automatic
-        #endif
-    }
-
-    private var toolbarTrailingPlacement: ToolbarItemPlacement {
-        #if os(iOS)
-        .topBarTrailing
-        #else
-        .automatic
-        #endif
-    }
-
     private func deleteSelectedHosts() {
         let hostsToDelete = selectedHosts
         for host in hostsToDelete {
@@ -153,7 +149,9 @@ struct HostsListView: View {
             modelContext.delete(host)
         }
         try? modelContext.save()
-        editMode = .inactive
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            editMode = .inactive
+        }
         selectedHostIDs.removeAll()
     }
 
@@ -163,4 +161,5 @@ struct HostsListView: View {
         try? modelContext.save()
         pendingDeleteHost = nil
     }
+
 }

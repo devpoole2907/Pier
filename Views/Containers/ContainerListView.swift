@@ -10,6 +10,7 @@ struct ContainerListView: View {
     @State private var selectedContainerIDs: Set<String> = []
     @State private var pendingBulkAction: BulkContainerAction?
     @AppStorage("refreshIntervalSeconds") private var refreshIntervalRaw: Int = RefreshInterval.medium.rawValue
+    @AppStorage("showStoppedContainers") private var showStoppedContainers: Bool = true
 
     init(client: PortainerClient, endpointID: Int) {
         _viewModel = State(initialValue: ContainerListViewModel(client: client, endpointID: endpointID))
@@ -21,7 +22,7 @@ struct ContainerListView: View {
                 LoadingView(message: "Loading containers…")
             } else if let error = viewModel.loadError, viewModel.containers.isEmpty {
                 ErrorView(error: error, retry: {
-                    Task { await viewModel.load() }
+                    Task { await viewModel.load(includeStopped: showStoppedContainers) }
                 })
             } else if viewModel.containers.isEmpty {
                 EmptyStateView(
@@ -35,23 +36,20 @@ struct ContainerListView: View {
                 contentList
             }
         }
+        .environment(\.editMode, $editMode)
         .searchable(text: $viewModel.searchText, prompt: "Search containers")
-        .refreshable { await viewModel.refresh() }
+        .refreshable { await viewModel.refresh(includeStopped: showStoppedContainers) }
         .toolbar { selectionToolbar }
         .alert(item: $viewModel.pendingDestructiveAction, content: destructiveContainerAlert)
         .alert(item: $pendingBulkAction, content: bulkContainerAlert)
-        .task { await viewModel.load() }
-        .task(id: refreshIntervalRaw) {
+        .task(id: showStoppedContainers) {
+            await viewModel.load(includeStopped: showStoppedContainers)
+        }
+        .task(id: pollingConfiguration) {
             guard let interval = RefreshInterval(rawValue: refreshIntervalRaw)?.seconds else { return }
-            await viewModel.runPolling(every: interval)
+            await viewModel.runPolling(every: interval, includeStopped: showStoppedContainers)
         }
         .navigationSubtitle(navigationSubtitleText)
-        .environment(\.editMode, $editMode)
-        .onChange(of: editMode) { _, mode in
-            if mode == .inactive {
-                selectedContainerIDs.removeAll()
-            }
-        }
     }
 
     @ViewBuilder
@@ -73,12 +71,29 @@ struct ContainerListView: View {
 
     @ToolbarContentBuilder
     private var selectionToolbar: some ToolbarContent {
-        ToolbarItem(placement: toolbarLeadingPlacement) {
-            if !viewModel.visibleContainers.isEmpty {
-                EditButton()
+        if !viewModel.visibleContainers.isEmpty {
+            ToolbarItem(placement: .platformTrailing) {
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        editMode = isSelecting ? .inactive : .active
+                    }
+                    if !editMode.isEditing {
+                        selectedContainerIDs.removeAll()
+                    }
+                } label: {
+                    if isSelecting {
+                        Image(systemName: "xmark")
+                            .accessibilityLabel("Done")
+                    } else {
+                        Text("Select")
+                    }
+                }
             }
+
+            ToolbarSpacer(.fixed, placement: .platformTrailing)
         }
-        ToolbarItem(placement: toolbarTrailingPlacement) {
+
+        ToolbarItem(placement: .platformTrailing) {
             if isSelecting {
                 Menu("Actions", systemImage: "ellipsis.circle") {
                     Button("Start selected", systemImage: "play.fill") {
@@ -115,28 +130,12 @@ struct ContainerListView: View {
         }
     }
 
-    private var toolbarTrailingPlacement: ToolbarItemPlacement {
-        #if os(iOS)
-        .topBarTrailing
-        #else
-        .automatic
-        #endif
-    }
-
-    private var toolbarLeadingPlacement: ToolbarItemPlacement {
-        #if os(iOS)
-        .topBarLeading
-        #else
-        .automatic
-        #endif
+    private var selectionSubtitle: String? {
+        selectedContainerIDs.isEmpty ? nil : "\(selectedContainerIDs.count) selected"
     }
 
     private var isSelecting: Bool {
         editMode.isEditing
-    }
-
-    private var selectionSubtitle: String? {
-        selectedContainerIDs.isEmpty ? nil : "\(selectedContainerIDs.count) selected"
     }
 
     private var activeHostName: String? {
@@ -149,6 +148,13 @@ struct ContainerListView: View {
 
     private var selectedContainers: [Container] {
         viewModel.visibleContainers.filter { selectedContainerIDs.contains($0.id) }
+    }
+
+    private var pollingConfiguration: ContainerPollingConfiguration {
+        ContainerPollingConfiguration(
+            refreshIntervalRaw: refreshIntervalRaw,
+            showStoppedContainers: showStoppedContainers
+        )
     }
 
     private var runningSelectedContainers: [Container] {
@@ -223,8 +229,15 @@ struct ContainerListView: View {
         case .delete:
             await viewModel.performBulkAction(.delete, on: targets)
         }
-        selectedContainerIDs.subtract(targets.map(\.id))
+        if viewModel.loadError == nil {
+            selectedContainerIDs.subtract(targets.map(\.id))
+        }
     }
+}
+
+private struct ContainerPollingConfiguration: Equatable {
+    let refreshIntervalRaw: Int
+    let showStoppedContainers: Bool
 }
 
 private enum BulkContainerAction: String, Identifiable {

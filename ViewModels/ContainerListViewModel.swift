@@ -33,6 +33,7 @@ final class ContainerListViewModel {
 
     private let client: PortainerClient
     private let endpointID: Int
+    private var includesStopped = true
 
     init(client: PortainerClient, endpointID: Int) {
         self.client = client
@@ -73,30 +74,30 @@ final class ContainerListViewModel {
             .sorted { $0.0.localizedStandardCompare($1.0) == .orderedAscending }
     }
 
-    func load() async {
+    func load(includeStopped: Bool = true) async {
+        includesStopped = includeStopped
         isLoading = true
         defer { isLoading = false }
         do {
-            self.containers = try await client.listContainers(endpointID: endpointID)
+            self.containers = try await client.listContainers(endpointID: endpointID, includeStopped: includeStopped)
             self.loadError = nil
-        } catch let error as PortainerError {
-            self.loadError = error
         } catch {
-            self.loadError = .serverError(code: -1, message: error.localizedDescription)
+            self.loadError = PortainerError.from(error)
         }
     }
 
-    func refresh() async {
-        await load()
+    func refresh(includeStopped: Bool = true) async {
+        await load(includeStopped: includeStopped)
     }
 
     /// Long-running polling loop. Returns when the surrounding task is cancelled.
     /// Drive this from a view's `.task(id:)` so cancellation flows naturally on view disappearance
     /// or interval change.
-    func runPolling(every seconds: TimeInterval) async {
+    func runPolling(every seconds: TimeInterval, includeStopped: Bool = true) async {
         while !Task.isCancelled {
-            await load()
             try? await Task.sleep(for: .seconds(seconds))
+            guard !Task.isCancelled else { return }
+            await load(includeStopped: includeStopped)
         }
     }
 
@@ -163,11 +164,9 @@ final class ContainerListViewModel {
     private func performAction(_ body: @escaping @Sendable () async throws -> Void) async {
         do {
             try await body()
-            await load()
-        } catch let error as PortainerError {
-            self.loadError = error
+            await load(includeStopped: includesStopped)
         } catch {
-            self.loadError = .serverError(code: -1, message: error.localizedDescription)
+            self.loadError = PortainerError.from(error)
         }
     }
 
@@ -179,11 +178,9 @@ final class ContainerListViewModel {
             for container in containers {
                 try await operation(container)
             }
-            await load()
-        } catch let error as PortainerError {
-            self.loadError = error
+            await load(includeStopped: includesStopped)
         } catch {
-            self.loadError = .serverError(code: -1, message: error.localizedDescription)
+            self.loadError = PortainerError.from(error)
         }
     }
 }

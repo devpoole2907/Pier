@@ -37,10 +37,8 @@ final class ImagesViewModel {
         do {
             self.images = try await client.listImages(endpointID: endpointID)
             self.loadError = nil
-        } catch let error as PortainerError {
-            self.loadError = error
         } catch {
-            self.loadError = .serverError(code: -1, message: error.localizedDescription)
+            self.loadError = PortainerError.from(error)
         }
     }
 
@@ -48,10 +46,8 @@ final class ImagesViewModel {
         do {
             try await client.deleteImage(endpointID: endpointID, imageID: image.id, force: force)
             await load()
-        } catch let error as PortainerError {
-            self.loadError = error
         } catch {
-            self.loadError = .serverError(code: -1, message: error.localizedDescription)
+            self.loadError = PortainerError.from(error)
         }
     }
 
@@ -63,13 +59,9 @@ final class ImagesViewModel {
             do {
                 try await client.deleteImage(endpointID: endpointID, imageID: image.id, force: force)
                 deletedImageIDs.append(image.id)
-            } catch let error as PortainerError {
-                if firstError == nil {
-                    firstError = error
-                }
             } catch {
                 if firstError == nil {
-                    firstError = .serverError(code: -1, message: error.localizedDescription)
+                    firstError = PortainerError.from(error)
                 }
             }
         }
@@ -97,10 +89,8 @@ final class ImagesViewModel {
             try await client.pullImage(endpointID: endpointID, fromImage: name, tag: tag)
             self.pullError = nil
             await load()
-        } catch let error as PortainerError {
-            self.pullError = error
         } catch {
-            self.pullError = .serverError(code: -1, message: error.localizedDescription)
+            self.pullError = PortainerError.from(error)
         }
     }
 }

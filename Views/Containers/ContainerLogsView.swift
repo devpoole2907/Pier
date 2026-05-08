@@ -38,23 +38,15 @@ struct ContainerLogsView: View {
 
     @ToolbarContentBuilder
     private var logsToolbar: some ToolbarContent {
-        ToolbarItem(placement: toolbarTrailingPlacement) {
+        ToolbarItem(placement: .platformTrailing) {
             Button(viewModel.isFollowing ? "Stop Live Tail" : "Start Live Tail",
                    systemImage: viewModel.isFollowing ? "dot.radiowaves.left.and.right" : "dot.radiowaves.right",
                    action: toggleFollowing)
                 .help(viewModel.isFollowing ? "Stop streaming new log lines as they arrive." : "Start streaming new log lines as they arrive.")
         }
-        ToolbarItem(placement: toolbarTrailingPlacement) {
+        ToolbarItem(placement: .platformTrailing) {
             Button("Copy", systemImage: "doc.on.doc", action: copyToClipboard)
         }
-    }
-
-    private var toolbarTrailingPlacement: ToolbarItemPlacement {
-        #if os(iOS)
-        .topBarTrailing
-        #else
-        .automatic
-        #endif
     }
 
     private func toggleFollowing() {

@@ -85,23 +85,27 @@ final class HostManager {
             self.activeEndpointID = endpoints.first(where: \.isUp)?.id ?? endpoints.first?.id
             self.lastError = nil
             hostsLogger.info("Resolved active endpoint \(self.activeEndpointID ?? -1) for host \(host.id.uuidString, privacy: .private(mask: .hash))")
-        } catch let error as PortainerError {
-            self.lastError = error
-            hostsLogger.error("Failed to resolve endpoints for host \(host.id.uuidString, privacy: .private(mask: .hash)): \(error.localizedDescription, privacy: .private)")
         } catch {
-            self.lastError = .serverError(code: -1, message: error.localizedDescription)
+            let portainerError = PortainerError.from(error)
+            self.lastError = portainerError
             hostsLogger.error("Failed to resolve endpoints for host \(host.id.uuidString, privacy: .private(mask: .hash)): \(error.localizedDescription, privacy: .private)")
         }
     }
 
     /// Convenience: client for the currently active host, if there is one.
     /// Returns nil rather than throwing because views often want to render an empty state instead.
-    func activeClient(in context: ModelContext) -> (host: Host, client: PortainerClient, endpointID: Int)? {
+    func resolveActiveClient(in context: ModelContext) throws -> (host: Host, client: PortainerClient, endpointID: Int)? {
         guard let activeHostID,
               let activeEndpointID else { return nil }
         let descriptor = FetchDescriptor<Host>(predicate: #Predicate { $0.id == activeHostID })
-        guard let host = try? context.fetch(descriptor).first,
-              let client = try? client(for: host) else { return nil }
+        guard let host = try context.fetch(descriptor).first else {
+            throw PortainerError.serverError(code: -1, message: "The active host could not be found.")
+        }
+        let client = try client(for: host)
         return (host, client, activeEndpointID)
+    }
+
+    func activeClient(in context: ModelContext) -> (host: Host, client: PortainerClient, endpointID: Int)? {
+        try? resolveActiveClient(in: context)
     }
 }

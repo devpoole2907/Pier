@@ -9,6 +9,7 @@ struct ActiveHostGate<Content: View>: View {
     @Query(sort: \Host.createdAt) private var hosts: [Host]
 
     @ViewBuilder private let content: (Host, PortainerClient, Int) -> Content
+    private typealias ActiveClient = (host: Host, client: PortainerClient, endpointID: Int)
 
     init(@ViewBuilder content: @escaping (Host, PortainerClient, Int) -> Content) {
         self.content = content
@@ -16,12 +17,22 @@ struct ActiveHostGate<Content: View>: View {
 
     @ViewBuilder
     var body: some View {
-        if let active = hostManager.activeClient(in: modelContext) {
+        switch activeClientResult {
+        case .success(let active):
             content(active.host, active.client, active.endpointID)
-        } else if hostManager.activeHostID != nil {
-            connectionStateView
-        } else {
-            NoHostConfiguredView()
+        case .failure(let error):
+            ErrorView(
+                error: error,
+                retry: retryConnection,
+                secondaryActionTitle: editServerActionTitle,
+                secondaryAction: editServerAction
+            )
+        case nil:
+            if hostManager.activeHostID != nil {
+                connectionStateView
+            } else {
+                NoHostConfiguredView()
+            }
         }
     }
 
@@ -49,6 +60,7 @@ struct ActiveHostGate<Content: View>: View {
     private func editActiveHost() {
         guard let host = activeHost else { return }
         hostManager.editingHost = host
+        hostManager.isPresentingHostEditor = true
     }
 
     private var editServerActionTitle: String? {
@@ -63,5 +75,14 @@ struct ActiveHostGate<Content: View>: View {
     private var activeHost: Host? {
         guard let activeHostID = hostManager.activeHostID else { return nil }
         return hosts.first(where: { $0.id == activeHostID })
+    }
+
+    private var activeClientResult: Result<ActiveClient, PortainerError>? {
+        do {
+            guard let active = try hostManager.resolveActiveClient(in: modelContext) else { return nil }
+            return .success(active)
+        } catch {
+            return .failure(PortainerError.from(error))
+        }
     }
 }

@@ -33,10 +33,8 @@ final class StatsViewModel {
                     guard let self else { return }
                     self.append(sample)
                 }
-            } catch let error as PortainerError {
-                self?.streamError = error
             } catch {
-                self?.streamError = .serverError(code: -1, message: error.localizedDescription)
+                self?.streamError = PortainerError.from(error)
             }
             self?.isStreaming = false
         }

@@ -32,6 +32,30 @@ struct ContainerRowView: View {
     }
 }
 
+struct SelectableContainerRow: View {
+    let container: Container
+    let viewModel: ContainerListViewModel
+    let isSelecting: Bool
+
+    var body: some View {
+        if isSelecting {
+            ContainerRowView(container: container)
+            .tag(container.id)
+        } else {
+            NavigationLink(value: ContainerNavigationValue(containerID: container.id, displayName: container.displayName)) {
+                ContainerRowView(container: container)
+            }
+            .tag(container.id)
+            .swipeActions(edge: .trailing) {
+                ContainerSwipeActions(container: container, viewModel: viewModel)
+            }
+            .contextMenu {
+                ContainerContextMenu(container: container, viewModel: viewModel)
+            }
+        }
+    }
+}
+
 #Preview {
     List {
         // No previewable real data without a server; keep blank to avoid invented containers.

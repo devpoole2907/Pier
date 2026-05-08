@@ -36,14 +36,9 @@ struct StacksListView: View {
                 }
             }
         }
+        .environment(\.editMode, $editMode)
         .toolbar { stacksToolbar }
         .navigationSubtitle(navigationSubtitleText)
-        .environment(\.editMode, $editMode)
-        .onChange(of: editMode) { _, mode in
-            if mode == .inactive {
-                selectedStackIDs.removeAll()
-            }
-        }
         .alert(item: $pendingBulkAction, content: bulkStackAlert)
         .refreshable { await viewModel.load() }
         .task { await viewModel.load() }
@@ -51,12 +46,31 @@ struct StacksListView: View {
 
     @ToolbarContentBuilder
     private var stacksToolbar: some ToolbarContent {
-        ToolbarItem(placement: toolbarLeadingPlacement) {
-            if !viewModel.stacks.isEmpty {
-                EditButton()
+        if !viewModel.stacks.isEmpty {
+            ToolbarItem(placement: .platformTrailing) {
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        editMode = isSelecting ? .inactive : .active
+                    }
+                    if !editMode.isEditing {
+                        selectedStackIDs.removeAll()
+                    }
+                } label: {
+                    if isSelecting {
+                        Image(systemName: "xmark")
+                            .accessibilityLabel("Done")
+                    } else {
+                        Text("Select")
+                    }
+                }
+            }
+
+            if isSelecting {
+                ToolbarSpacer(.fixed, placement: .platformTrailing)
             }
         }
-        ToolbarItem(placement: toolbarTrailingPlacement) {
+
+        ToolbarItem(placement: .platformTrailing) {
             if isSelecting {
                 Menu("Actions", systemImage: "ellipsis.circle") {
                     Button("Start selected", systemImage: "play.fill") {
@@ -77,26 +91,6 @@ struct StacksListView: View {
         }
     }
 
-    private var toolbarTrailingPlacement: ToolbarItemPlacement {
-        #if os(iOS)
-        .topBarTrailing
-        #else
-        .automatic
-        #endif
-    }
-
-    private var toolbarLeadingPlacement: ToolbarItemPlacement {
-        #if os(iOS)
-        .topBarLeading
-        #else
-        .automatic
-        #endif
-    }
-
-    private var isSelecting: Bool {
-        editMode.isEditing
-    }
-
     private var selectedStacks: [Stack] {
         viewModel.stacks.filter { selectedStackIDs.contains($0.id) }
     }
@@ -113,6 +107,10 @@ struct StacksListView: View {
         selectedStackIDs.isEmpty ? nil : "\(selectedStackIDs.count) selected"
     }
 
+    private var isSelecting: Bool {
+        editMode.isEditing
+    }
+
     private var activeHostName: String? {
         hostManager.activeClient(in: modelContext)?.host.name
     }
@@ -125,7 +123,7 @@ struct StacksListView: View {
     private func row(for stack: Stack) -> some View {
         if isSelecting {
             StackRowView(stack: stack)
-                .tag(stack.id)
+            .tag(stack.id)
         } else {
             NavigationLink(value: stack) {
                 StackRowView(stack: stack)

@@ -32,17 +32,9 @@ struct StackEditorView: View {
         ToolbarItem(placement: .cancellationAction) {
             Button("Done", action: dismiss.callAsFunction)
         }
-        ToolbarItem(placement: toolbarTrailingPlacement) {
+        ToolbarItem(placement: .platformTrailing) {
             Button("Copy", systemImage: "doc.on.doc", action: copy)
         }
-    }
-
-    private var toolbarTrailingPlacement: ToolbarItemPlacement {
-        #if os(iOS)
-        .topBarTrailing
-        #else
-        .automatic
-        #endif
     }
 
     private func copy() {
