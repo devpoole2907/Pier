@@ -15,8 +15,9 @@ struct StackServicesSection: View {
             } else {
                 ForEach(services) { container in
                     NavigationLink(value: ContainerNavigationValue(containerID: container.id, displayName: container.displayName)) {
-                        ContainerRowView(container: container)
+                        ContainerRowView(container: container, actionState: viewModel.actionState(for: container))
                     }
+                    .disabled(viewModel.isActionInProgress(for: container))
                 }
             }
         }

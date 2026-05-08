@@ -26,6 +26,7 @@ final class ContainerListViewModel {
     private(set) var containers: [Container] = []
     private(set) var isLoading = false
     private(set) var loadError: PortainerError?
+    private(set) var actionStatesByContainerID: [String: ContainerActionState] = [:]
 
     var filter: ContainerFilter = .all
     var searchText: String = ""
@@ -104,7 +105,9 @@ final class ContainerListViewModel {
     // MARK: - Container actions
 
     func start(_ container: Container) async {
-        await performAction { try await self.client.startContainer(endpointID: self.endpointID, containerID: container.id) }
+        await performAction(for: container, actionState: .starting) {
+            try await self.client.startContainer(endpointID: self.endpointID, containerID: container.id)
+        }
     }
 
     func stop(_ container: Container) {
@@ -128,26 +131,32 @@ final class ContainerListViewModel {
         pendingDestructiveAction = nil
         switch pending.action {
         case .stop:
-            await performAction { try await self.client.stopContainer(endpointID: self.endpointID, containerID: pending.container.id) }
+            await performAction(for: pending.container, actionState: .stopping) {
+                try await self.client.stopContainer(endpointID: self.endpointID, containerID: pending.container.id)
+            }
         case .restart:
-            await performAction { try await self.client.restartContainer(endpointID: self.endpointID, containerID: pending.container.id) }
+            await performAction(for: pending.container, actionState: .restarting) {
+                try await self.client.restartContainer(endpointID: self.endpointID, containerID: pending.container.id)
+            }
         case .kill:
-            await performAction { try await self.client.killContainer(endpointID: self.endpointID, containerID: pending.container.id) }
+            await performAction(for: pending.container, actionState: .killing) {
+                try await self.client.killContainer(endpointID: self.endpointID, containerID: pending.container.id)
+            }
         case .delete:
-            await performAction {
+            await performAction(for: pending.container, actionState: .deleting) {
                 try await self.client.deleteContainer(endpointID: self.endpointID, containerID: pending.container.id, force: true, removeVolumes: false)
             }
         }
     }
 
     func start(_ containers: [Container]) async {
-        await performActions(containers) { container in
+        await performActions(containers, actionState: .starting) { container in
             try await self.client.startContainer(endpointID: self.endpointID, containerID: container.id)
         }
     }
 
     func performBulkAction(_ action: DestructiveAction, on containers: [Container]) async {
-        await performActions(containers) { container in
+        await performActions(containers, actionState: ContainerActionState(action: action)) { container in
             switch action {
             case .stop:
                 try await self.client.stopContainer(endpointID: self.endpointID, containerID: container.id)
@@ -161,7 +170,21 @@ final class ContainerListViewModel {
         }
     }
 
-    private func performAction(_ body: @escaping @Sendable () async throws -> Void) async {
+    func actionState(for container: Container) -> ContainerActionState? {
+        actionStatesByContainerID[container.id]
+    }
+
+    func isActionInProgress(for container: Container) -> Bool {
+        actionState(for: container) != nil
+    }
+
+    private func performAction(
+        for container: Container,
+        actionState: ContainerActionState,
+        body: @escaping @Sendable () async throws -> Void
+    ) async {
+        actionStatesByContainerID[container.id] = actionState
+        defer { actionStatesByContainerID[container.id] = nil }
         do {
             try await body()
             await load(includeStopped: includesStopped)
@@ -172,8 +195,17 @@ final class ContainerListViewModel {
 
     private func performActions(
         _ containers: [Container],
+        actionState: ContainerActionState,
         operation: @escaping @Sendable (Container) async throws -> Void
     ) async {
+        for container in containers {
+            actionStatesByContainerID[container.id] = actionState
+        }
+        defer {
+            for container in containers {
+                actionStatesByContainerID[container.id] = nil
+            }
+        }
         do {
             for container in containers {
                 try await operation(container)
@@ -190,4 +222,39 @@ struct PendingContainerAction: Identifiable {
     let action: DestructiveAction
 
     var id: String { "\(container.id)-\(action.rawValue)" }
+}
+
+enum ContainerActionState: String, Sendable {
+    case starting
+    case stopping
+    case restarting
+    case killing
+    case deleting
+
+    init(action: DestructiveAction) {
+        switch action {
+        case .stop:
+            self = .stopping
+        case .restart:
+            self = .restarting
+        case .kill:
+            self = .killing
+        case .delete:
+            self = .deleting
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .starting: "Starting"
+        case .stopping: "Stopping"
+        case .restarting: "Restarting"
+        case .killing: "Killing"
+        case .deleting: "Deleting"
+        }
+    }
+
+    var rowDetailText: String {
+        "\(displayName) request in progress"
+    }
 }

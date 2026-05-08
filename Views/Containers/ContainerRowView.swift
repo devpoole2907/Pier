@@ -3,6 +3,12 @@ import SwiftUI
 /// One row in the container list. Shows name, status, image, and uptime/since.
 struct ContainerRowView: View {
     let container: Container
+    let actionState: ContainerActionState?
+
+    init(container: Container, actionState: ContainerActionState? = nil) {
+        self.container = container
+        self.actionState = actionState
+    }
 
     var body: some View {
         HStack(alignment: .center, spacing: DesignSystem.Spacing.medium) {
@@ -16,19 +22,39 @@ struct ContainerRowView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                if !container.status.isEmpty {
-                    Text(container.status)
+                if let statusText {
+                    Text(statusText)
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
                 }
             }
             Spacer(minLength: DesignSystem.Spacing.small)
-            StatusBadgeView(status: container.state)
+            statusBadge
         }
         .padding(.vertical, DesignSystem.Spacing.tight)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(container.displayName), \(container.state.displayName), image \(container.image)")
+        .accessibilityLabel("\(container.displayName), \(accessibilityStatusText), image \(container.image)")
+    }
+
+    private var statusText: String? {
+        if let actionState {
+            return actionState.rowDetailText
+        }
+        return container.status.isEmpty ? nil : container.status
+    }
+
+    private var accessibilityStatusText: String {
+        actionState?.displayName ?? container.state.displayName
+    }
+
+    @ViewBuilder
+    private var statusBadge: some View {
+        if let actionState {
+            StatusBadgeView(actionState: actionState)
+        } else {
+            StatusBadgeView(status: container.state)
+        }
     }
 }
 
@@ -38,14 +64,16 @@ struct SelectableContainerRow: View {
     let isSelecting: Bool
 
     var body: some View {
+        let actionState = viewModel.actionState(for: container)
         if isSelecting {
-            ContainerRowView(container: container)
-            .tag(container.id)
+            ContainerRowView(container: container, actionState: actionState)
+                .tag(container.id)
         } else {
             NavigationLink(value: ContainerNavigationValue(containerID: container.id, displayName: container.displayName)) {
-                ContainerRowView(container: container)
+                ContainerRowView(container: container, actionState: actionState)
             }
             .tag(container.id)
+            .disabled(actionState != nil)
             .swipeActions(edge: .trailing) {
                 ContainerSwipeActions(container: container, viewModel: viewModel)
             }

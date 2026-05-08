@@ -32,3 +32,23 @@ extension ContainerStatus {
         rawValue.capitalized
     }
 }
+
+extension ContainerActionState {
+    var color: Color {
+        switch self {
+        case .starting: .green
+        case .stopping, .restarting: .yellow
+        case .killing, .deleting: .orange
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .starting: "play.circle.fill"
+        case .stopping: "stop.circle.fill"
+        case .restarting: "arrow.clockwise.circle.fill"
+        case .killing: "bolt.slash.circle.fill"
+        case .deleting: "trash.circle.fill"
+        }
+    }
+}

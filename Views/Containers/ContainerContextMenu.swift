@@ -6,7 +6,10 @@ struct ContainerContextMenu: View {
     let viewModel: ContainerListViewModel
 
     var body: some View {
-        if container.state == .running {
+        if let actionState = viewModel.actionState(for: container) {
+            Button(actionState.displayName, systemImage: actionState.symbolName) {}
+                .disabled(true)
+        } else if container.state == .running {
             Button("Stop", systemImage: "stop.fill") {
                 viewModel.stop(container)
             }
