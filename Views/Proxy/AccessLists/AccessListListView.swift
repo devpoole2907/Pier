@@ -2,7 +2,7 @@ import SwiftUI
 
 struct AccessListListView: View {
     @State private var viewModel: NPMAccessListsViewModel
-    @State private var showEditor = false
+    @State private var isAddingList = false
     @State private var editingList: NPMAccessList?
 
     init(client: NPMClient) {
@@ -23,7 +23,7 @@ struct AccessListListView: View {
                 } actions: {
                     Button("Add access list", systemImage: "plus") {
                         editingList = nil
-                        showEditor = true
+                        isAddingList = true
                     }
                     .buttonStyle(.borderedProminent)
                 }
@@ -40,13 +40,18 @@ struct AccessListListView: View {
             ToolbarItem(placement: .platformTrailing) {
                 Button("Add", systemImage: "plus") {
                     editingList = nil
-                    showEditor = true
+                    isAddingList = true
                 }
             }
         }
-        .sheet(isPresented: $showEditor) {
+        .sheet(isPresented: $isAddingList) {
             NavigationStack {
-                AccessListEditorView(viewModel: viewModel, existing: editingList)
+                AccessListEditorView(viewModel: viewModel, existing: nil)
+            }
+        }
+        .sheet(item: $editingList) { list in
+            NavigationStack {
+                AccessListEditorView(viewModel: viewModel, existing: list)
             }
         }
         .task { await viewModel.load() }
@@ -58,7 +63,6 @@ struct AccessListListView: View {
             ForEach(viewModel.visibleItems) { list in
                 Button {
                     editingList = list
-                    showEditor = true
                 } label: {
                     AccessListRowView(list: list, actionState: viewModel.actionState(for: list.id))
                 }
@@ -67,7 +71,6 @@ struct AccessListListView: View {
                         if viewModel.actionState(for: list.id) == nil {
                             Button("Edit", systemImage: "pencil") {
                                 editingList = list
-                                showEditor = true
                             }
                             .tint(.blue)
                             Button("Delete", systemImage: "trash", role: .destructive) {
@@ -79,7 +82,6 @@ struct AccessListListView: View {
                         if viewModel.actionState(for: list.id) == nil {
                             Button("Edit", systemImage: "pencil") {
                                 editingList = list
-                                showEditor = true
                             }
                             Button("Delete", systemImage: "trash", role: .destructive) {
                                 Task { await viewModel.delete(list.id) }

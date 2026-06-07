@@ -2,7 +2,7 @@ import SwiftUI
 
 struct StreamListView: View {
     @State private var viewModel: NPMStreamsViewModel
-    @State private var showEditor = false
+    @State private var isAddingStream = false
     @State private var editingStream: NPMStream?
 
     init(client: NPMClient) {
@@ -23,7 +23,7 @@ struct StreamListView: View {
                 } actions: {
                     Button("Add stream", systemImage: "plus") {
                         editingStream = nil
-                        showEditor = true
+                        isAddingStream = true
                     }
                     .buttonStyle(.borderedProminent)
                 }
@@ -40,13 +40,18 @@ struct StreamListView: View {
             ToolbarItem(placement: .platformTrailing) {
                 Button("Add", systemImage: "plus") {
                     editingStream = nil
-                    showEditor = true
+                    isAddingStream = true
                 }
             }
         }
-        .sheet(isPresented: $showEditor) {
+        .sheet(isPresented: $isAddingStream) {
             NavigationStack {
-                StreamEditorView(viewModel: viewModel, existing: editingStream)
+                StreamEditorView(viewModel: viewModel, existing: nil)
+            }
+        }
+        .sheet(item: $editingStream) { stream in
+            NavigationStack {
+                StreamEditorView(viewModel: viewModel, existing: stream)
             }
         }
         .task { await viewModel.load() }
@@ -58,7 +63,6 @@ struct StreamListView: View {
             ForEach(viewModel.visibleItems) { stream in
                 Button {
                     editingStream = stream
-                    showEditor = true
                 } label: {
                     StreamRowView(stream: stream, actionState: viewModel.actionState(for: stream.id))
                 }
@@ -94,7 +98,6 @@ struct StreamListView: View {
                             }
                             Button("Edit", systemImage: "pencil") {
                                 editingStream = stream
-                                showEditor = true
                             }
                             Button("Delete", systemImage: "trash", role: .destructive) {
                                 Task { await viewModel.delete(stream.id) }

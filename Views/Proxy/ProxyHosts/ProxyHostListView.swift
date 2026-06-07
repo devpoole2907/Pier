@@ -3,7 +3,7 @@ import SwiftUI
 struct ProxyHostListView: View {
     @Environment(NPMHostManager.self) private var npmHostManager
     @State private var viewModel: NPMProxyHostsViewModel
-    @State private var showEditor = false
+    @State private var isAddingHost = false
     @State private var editingHost: NPMProxyHost?
 
     init(client: NPMClient) {
@@ -24,7 +24,7 @@ struct ProxyHostListView: View {
                 } actions: {
                     Button("Add proxy host", systemImage: "plus") {
                         editingHost = nil
-                        showEditor = true
+                        isAddingHost = true
                     }
                     .buttonStyle(.borderedProminent)
                 }
@@ -41,15 +41,23 @@ struct ProxyHostListView: View {
             ToolbarItem(placement: .platformTrailing) {
                 Button("Add", systemImage: "plus") {
                     editingHost = nil
-                    showEditor = true
+                    isAddingHost = true
                 }
             }
         }
-        .sheet(isPresented: $showEditor) {
+        .sheet(isPresented: $isAddingHost) {
             NavigationStack {
                 ProxyHostEditorView(
                     viewModel: viewModel,
-                    existing: editingHost
+                    existing: nil
+                )
+            }
+        }
+        .sheet(item: $editingHost) { host in
+            NavigationStack {
+                ProxyHostEditorView(
+                    viewModel: viewModel,
+                    existing: host
                 )
             }
         }
@@ -62,7 +70,6 @@ struct ProxyHostListView: View {
             ForEach(viewModel.visibleItems) { host in
                 Button {
                     editingHost = host
-                    showEditor = true
                 } label: {
                     ProxyHostRowView(host: host, actionState: viewModel.actionState(for: host.id))
                 }
@@ -98,7 +105,6 @@ struct ProxyHostListView: View {
                             }
                             Button("Edit", systemImage: "pencil") {
                                 editingHost = host
-                                showEditor = true
                             }
                             Button("Delete", systemImage: "trash", role: .destructive) {
                                 Task { await viewModel.delete(host.id) }
