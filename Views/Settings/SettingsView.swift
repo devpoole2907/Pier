@@ -4,10 +4,12 @@ import SwiftData
 /// Main settings screen. Splits configuration into sections: hosts, refresh, theme, display, about.
 struct SettingsView: View {
     @Environment(HostManager.self) private var hostManager
+    @Environment(NPMHostManager.self) private var npmHostManager
     @AppStorage("refreshIntervalSeconds") private var refreshIntervalRaw: Int = RefreshInterval.medium.rawValue
     @AppStorage("themePreference") private var themeRawValue: String = AppTheme.system.rawValue
     @AppStorage("showStoppedContainers") private var showStoppedContainers: Bool = true
     @Query(sort: \Host.createdAt) private var hosts: [Host]
+    @Query(sort: \NPMHost.createdAt) private var npmHosts: [NPMHost]
 
     var body: some View {
         Form {
@@ -20,7 +22,21 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     } label: {
-                        Label("Manage hosts", systemImage: "externaldrive")
+                        Label("Manage Portainer hosts", systemImage: "externaldrive")
+                    }
+                }
+            }
+
+            Section("Nginx Proxy Manager") {
+                NavigationLink {
+                    NPMHostsListView()
+                } label: {
+                    LabeledContent {
+                        Text(activeNPMHostName)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    } label: {
+                        Label("Manage NPM hosts", systemImage: "arrow.triangle.branch")
                     }
                 }
             }
@@ -74,5 +90,13 @@ struct SettingsView: View {
             return "None"
         }
         return activeHost.name
+    }
+
+    private var activeNPMHostName: String {
+        guard let activeID = npmHostManager.activeNPMHostID,
+              let active = npmHosts.first(where: { $0.id == activeID }) else {
+            return "None"
+        }
+        return active.name
     }
 }

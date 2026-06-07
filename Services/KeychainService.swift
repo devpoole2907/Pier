@@ -122,6 +122,67 @@ enum KeychainStore {
     }
 }
 
+// MARK: - NPM credentials
+
+extension KeychainService {
+    nonisolated private static let npmTokenService = "com.poole.james.pier.npm.jwt"
+    nonisolated private static let npmPasswordService = "com.poole.james.pier.npm.password"
+    nonisolated private static let npmAPITokenService = "com.poole.james.pier.npm.apitoken"
+
+    nonisolated static func storeNPMJWT(token: String, for hostID: UUID) throws {
+        try KeychainStore.store(
+            value: token,
+            service: npmTokenService,
+            account: hostID.uuidString,
+            accessibility: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        )
+    }
+
+    nonisolated static func npmJWT(for hostID: UUID) throws -> String? {
+        try KeychainStore.value(service: npmTokenService, account: hostID.uuidString)
+    }
+
+    nonisolated static func storeNPMPassword(password: String, for hostID: UUID) throws {
+        try KeychainStore.store(
+            value: password,
+            service: npmPasswordService,
+            account: hostID.uuidString,
+            accessibility: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        )
+    }
+
+    nonisolated static func npmPassword(for hostID: UUID) throws -> String? {
+        try KeychainStore.value(service: npmPasswordService, account: hostID.uuidString)
+    }
+
+    nonisolated static func storeNPMAPIToken(token: String, for hostID: UUID) throws {
+        try KeychainStore.store(
+            value: token,
+            service: npmAPITokenService,
+            account: hostID.uuidString,
+            accessibility: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        )
+    }
+
+    nonisolated static func npmAPIToken(for hostID: UUID) throws -> String? {
+        try KeychainStore.value(service: npmAPITokenService, account: hostID.uuidString)
+    }
+
+    nonisolated static func deleteNPMCredentials(for hostID: UUID) throws {
+        var errors: [Error] = []
+        for svc in [npmTokenService, npmPasswordService, npmAPITokenService] {
+            do {
+                try KeychainStore.delete(service: svc, account: hostID.uuidString)
+            } catch {
+                errors.append(error)
+            }
+        }
+        if let first = errors.first {
+            throw first
+        }
+    }
+}
+
 enum KeychainError: Error, LocalizedError {
     case encodingFailed
     case unhandledStatus(OSStatus)

@@ -19,11 +19,14 @@ struct AppRootView: View {
             Tab(AppDestination.containers.displayName, systemImage: AppDestination.containers.systemImage, value: .containers) {
                 ContainersTab()
             }
+            Tab(AppDestination.proxy.displayName, systemImage: AppDestination.proxy.systemImage, value: .proxy) {
+                ProxyTab()
+            }
             Tab(AppDestination.stacks.displayName, systemImage: AppDestination.stacks.systemImage, value: .stacks) {
                 StacksTab()
             }
-            Tab(AppDestination.stats.displayName, systemImage: AppDestination.stats.systemImage, value: .stats) {
-                StatsTab()
+            Tab(AppDestination.ssh.displayName, systemImage: AppDestination.ssh.systemImage, value: .ssh) {
+                SSHTab()
             }
             Tab(AppDestination.more.displayName, systemImage: AppDestination.more.systemImage, value: .more) {
                 MoreTab()
@@ -78,7 +81,7 @@ struct AppRootView: View {
                sshSessionStore.activeProfile?.id.uuidString != requestedProfileID {
                 return
             }
-            selection = .more
+            selection = .ssh
             sshSessionStore.focusSession()
             isShowingSSHSession = true
         }

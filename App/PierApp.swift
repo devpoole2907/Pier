@@ -7,12 +7,13 @@ import BackgroundTasks
 @main
 struct PierApp: App {
     @State private var hostManager = HostManager()
+    @State private var npmHostManager = NPMHostManager()
     @State private var sshSessionStore = SSHSessionStore()
     @AppStorage("themePreference") private var themeRawValue: String = AppTheme.system.rawValue
 
     private let modelContainer: ModelContainer = {
         do {
-            let schema = Schema([Host.self, SSHProfile.self])
+            let schema = Schema([Host.self, NPMHost.self, SSHProfile.self])
             let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
             return try ModelContainer(for: schema, configurations: [configuration])
         } catch {
@@ -53,6 +54,7 @@ struct PierApp: App {
         WindowGroup {
             AppRootView()
                 .environment(hostManager)
+                .environment(npmHostManager)
                 .environment(sshSessionStore)
                 .preferredColorScheme(currentTheme.colorScheme)
                 .tint(DesignSystem.Colors.accent)

@@ -3,7 +3,7 @@ import SwiftUI
 /// A friendly error UI used when a load fails. Wraps `ContentUnavailableView` so we get the
 /// system look without re-implementing it.
 struct ErrorView: View {
-    let error: PortainerError
+    let errorDescription: String?
     let retry: (() -> Void)?
     let secondaryActionTitle: String?
     let secondaryAction: (() -> Void)?
@@ -14,7 +14,19 @@ struct ErrorView: View {
         secondaryActionTitle: String? = nil,
         secondaryAction: (() -> Void)? = nil
     ) {
-        self.error = error
+        self.errorDescription = error.errorDescription
+        self.retry = retry
+        self.secondaryActionTitle = secondaryActionTitle
+        self.secondaryAction = secondaryAction
+    }
+
+    init(
+        error: NPMError,
+        retry: (() -> Void)? = nil,
+        secondaryActionTitle: String? = nil,
+        secondaryAction: (() -> Void)? = nil
+    ) {
+        self.errorDescription = error.errorDescription
         self.retry = retry
         self.secondaryActionTitle = secondaryActionTitle
         self.secondaryAction = secondaryAction
@@ -24,7 +36,7 @@ struct ErrorView: View {
         ContentUnavailableView {
             Label("Something went wrong", systemImage: "exclamationmark.triangle")
         } description: {
-            Text(error.errorDescription ?? "Unknown error")
+            Text(errorDescription ?? "Unknown error")
         } actions: {
             if let retry {
                 Button("Try again", action: retry)
@@ -38,5 +50,5 @@ struct ErrorView: View {
 }
 
 #Preview {
-    ErrorView(error: .unauthorized, retry: { })
+    ErrorView(error: PortainerError.unauthorized, retry: { })
 }

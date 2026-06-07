@@ -2,19 +2,19 @@ import SwiftData
 import SwiftUI
 
 enum MoreDestination: Hashable {
-    case ssh
+    case stats
     case settings
     case images
 }
 
 enum MoreDestinationAccent {
-    case ssh
+    case stats
     case settings
     case images
 
     var color: Color {
         switch self {
-        case .ssh: .green
+        case .stats: .blue
         case .settings: .secondary
         case .images: .orange
         }
@@ -23,26 +23,22 @@ enum MoreDestinationAccent {
 
 struct MoreTab: View {
     @Environment(HostManager.self) private var hostManager
-    @Environment(SSHSessionStore.self) private var sshSessionStore
     @Environment(\.modelContext) private var modelContext
     @State private var path: [MoreDestination] = []
-    @State private var isShowingSession = false
 
     var body: some View {
         NavigationStack(path: $path) {
             List {
                 Section {
-                    NavigationLink(value: MoreDestination.ssh) {
+                    NavigationLink(value: MoreDestination.stats) {
                         moreRow(
-                            icon: "terminal.fill",
-                            color: MoreDestinationAccent.ssh.color,
-                            title: "SSH",
-                            subtitle: sshSessionStore.hasSession ? "Profiles and active shell access" : "Profiles and remote shell access"
+                            icon: "chart.line.uptrend.xyaxis",
+                            color: MoreDestinationAccent.stats.color,
+                            title: "Stats",
+                            subtitle: "Live CPU, memory, and container metrics"
                         )
                     }
-                }
 
-                Section {
                     NavigationLink(value: MoreDestination.images) {
                         moreRow(
                             icon: "photo.stack.fill",
@@ -51,7 +47,9 @@ struct MoreTab: View {
                             subtitle: "Browse local images and pull new ones"
                         )
                     }
+                }
 
+                Section {
                     NavigationLink(value: MoreDestination.settings) {
                         moreRow(
                             icon: "gearshape.fill",
@@ -71,10 +69,10 @@ struct MoreTab: View {
             .navigationTitle("More")
             .navigationDestination(for: MoreDestination.self) { destination in
                 switch destination {
-                case .ssh:
-                    SSHMoreDestination(isShowingSession: $isShowingSession)
+                case .stats:
+                    StatsMoreDestination()
                         .moreDestinationTitleStyle()
-                        .moreDestinationBackground(.ssh)
+                        .moreDestinationBackground(.stats)
                 case .settings:
                     SettingsView()
                         .navigationTitle("Settings")
@@ -87,7 +85,6 @@ struct MoreTab: View {
                 }
             }
         }
-        .sshSessionSheet(isPresented: $isShowingSession)
     }
 
     private func moreRow(icon: String, color: Color, title: String, subtitle: String) -> some View {
@@ -95,15 +92,11 @@ struct MoreTab: View {
     }
 }
 
-private struct SSHMoreDestination: View {
-    @Environment(SSHSessionStore.self) private var sshSessionStore
-    @Binding var isShowingSession: Bool
-
+private struct StatsMoreDestination: View {
     var body: some View {
-        SSHProfileListView { profile in
-            sshSessionStore.addSession(for: profile)
-            isShowingSession = true
-        }
+        StatsContainer()
+            .navigationTitle("Stats")
+            .hostTitleMenu()
     }
 }
 

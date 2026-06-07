@@ -4,8 +4,9 @@ import Foundation
 /// type-safe (per `views.md`: prefer enum values over integer/string tags).
 enum AppDestination: String, Hashable, CaseIterable, Identifiable {
     case containers
+    case proxy
     case stacks
-    case stats
+    case ssh
     case more
 
     var id: String { rawValue }
@@ -13,8 +14,9 @@ enum AppDestination: String, Hashable, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .containers: "Containers"
+        case .proxy: "Proxy"
         case .stacks: "Stacks"
-        case .stats: "Stats"
+        case .ssh: "SSH"
         case .more: "More"
         }
     }
@@ -22,8 +24,9 @@ enum AppDestination: String, Hashable, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .containers: "shippingbox.fill"
+        case .proxy: "arrow.triangle.branch"
         case .stacks: "square.stack.3d.up.fill"
-        case .stats: "chart.line.uptrend.xyaxis"
+        case .ssh: "terminal.fill"
         case .more: "ellipsis.circle"
         }
     }

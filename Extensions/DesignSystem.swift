@@ -6,6 +6,8 @@ enum DesignSystem {
     enum Colors {
         /// Portainer's current default "purple" active brand color from portainer.io.
         static let accent = Color(red: 192 / 255, green: 128 / 255, blue: 1)
+        /// Nginx Proxy Manager brand orange.
+        static let npm = Color(red: 241 / 255, green: 90 / 255, blue: 36 / 255)
     }
 
     enum Spacing {
@@ -60,5 +62,18 @@ extension Set {
         } else {
             insert(element)
         }
+    }
+}
+
+extension Color {
+    /// The system background used behind `.insetGrouped` lists — black in dark mode,
+    /// off-white in light mode. Use this (not `.white`/`.clear`) as the base for view
+    /// gradients so they blend seamlessly into the grouped-list backdrop.
+    static var groupedListBackground: Color {
+        #if os(iOS)
+        Color(uiColor: .systemGroupedBackground)
+        #else
+        Color(nsColor: .windowBackgroundColor)
+        #endif
     }
 }
