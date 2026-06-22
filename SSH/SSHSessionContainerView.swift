@@ -26,14 +26,15 @@ struct SSHSessionContainerView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbarTitleMenu {
+            let activeSessionID = store.activeSession?.id
             ForEach(store.sessions) { session in
                 Button {
                     store.activeSession = session
                 } label: {
-                    Text(session.sessionTitle)
-                    if store.activeSession?.id == session.id {
-                        Image(systemName: "checkmark")
-                    }
+                    SessionMenuLabel(
+                        title: session.sessionTitle,
+                        isActive: activeSessionID == session.id
+                    )
                 }
             }
             Divider()
@@ -95,7 +96,7 @@ struct SSHSessionContainerView: View {
             .presentationDetents([.large])
             .presentationCornerRadius(24)
         }
-        #if os(iOS)
+        #if os(iOS) && !targetEnvironment(macCatalyst)
         .onChange(of: scenePhase) { _, newPhase in
             switch newPhase {
             case .background:
@@ -160,6 +161,18 @@ struct SSHSessionContainerView: View {
                 }
                 .foregroundStyle(.green)
             }
+        }
+    }
+}
+
+private struct SessionMenuLabel: View {
+    let title: String
+    let isActive: Bool
+
+    var body: some View {
+        Text(title)
+        if isActive {
+            Image(systemName: "checkmark")
         }
     }
 }

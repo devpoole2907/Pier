@@ -1,6 +1,6 @@
 import SwiftUI
 import SwiftData
-#if os(iOS)
+#if os(iOS) && !targetEnvironment(macCatalyst)
 import BackgroundTasks
 #endif
 
@@ -28,7 +28,7 @@ struct PierApp: App {
             fatalError("Libssh2 bootstrap failed: \(error)")
         }
 
-        #if os(iOS)
+        #if os(iOS) && !targetEnvironment(macCatalyst)
         BGTaskScheduler.shared.register(
             forTaskWithIdentifier: SSHBackgroundService.taskIdentifier,
             using: nil

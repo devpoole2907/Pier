@@ -1,7 +1,7 @@
 import Foundation
 import OSLog
 
-#if os(iOS)
+#if os(iOS) && !targetEnvironment(macCatalyst)
 import BackgroundTasks
 
 /// App-level singleton that bridges BGAppRefreshTask to all active SSHConnections.

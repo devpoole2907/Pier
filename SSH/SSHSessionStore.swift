@@ -1,6 +1,6 @@
 import SwiftUI
 
-#if os(iOS)
+#if os(iOS) && !targetEnvironment(macCatalyst)
 import UIKit
 #endif
 
@@ -15,7 +15,7 @@ final class SSHSessionStore {
     }
     private let liveActivityManager = SSHLiveActivityManager()
 
-    #if os(iOS)
+    #if os(iOS) && !targetEnvironment(macCatalyst)
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
     #endif
 
@@ -68,7 +68,7 @@ final class SSHSessionStore {
         item.connection.onStateChange = { [weak self, weak item] newState in
             guard let self else { return }
             self.syncLiveActivity()
-            #if os(iOS)
+            #if os(iOS) && !targetEnvironment(macCatalyst)
             switch newState {
             case .connected:
                 if let item { SSHBackgroundService.shared.register(id: item.id, connection: item.connection) }
@@ -142,7 +142,7 @@ final class SSHSessionStore {
         }
     }
 
-    #if os(iOS)
+    #if os(iOS) && !targetEnvironment(macCatalyst)
     func beginBackgroundKeepAlive() {
         guard backgroundTaskID == .invalid,
               sessions.contains(where: { $0.connection.state == .connected }) else { return }

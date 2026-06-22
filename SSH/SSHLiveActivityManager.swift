@@ -1,6 +1,6 @@
 import Foundation
 
-#if os(iOS)
+#if os(iOS) && !targetEnvironment(macCatalyst)
 import ActivityKit
 
 @MainActor
@@ -82,7 +82,7 @@ final class SSHLiveActivityManager {
 #else
 @MainActor
 final class SSHLiveActivityManager {
-    func sync(sessionCount: Int, profileID: String?, hostDisplay: String, title: String, subtitle: String, statusText: String) {}
+    func sync(sessionCount: Int, profileID: String?, hostDisplay: String, title: String, subtitle: String, statusText: String) async {}
     func end() async {}
 }
 #endif
