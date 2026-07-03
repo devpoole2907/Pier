@@ -11,7 +11,7 @@ struct AppRootView: View {
     @Query(sort: \Host.createdAt) private var hosts: [Host]
     @Query(sort: \NPMHost.createdAt) private var npmHosts: [NPMHost]
     @Query(sort: \SSHProfile.createdAt) private var sshProfiles: [SSHProfile]
-    @State private var selection: AppDestination = .containers
+    @State private var selection: AppDestination = .dashboard
     @State private var isShowingSSHSession = false
     @State private var isShowingCloseSSHConfirm = false
     @State private var isInWelcomeFlow = true
@@ -51,17 +51,21 @@ struct AppRootView: View {
         @Bindable var hostManager = hostManager
 
         return TabView(selection: $selection) {
+            Tab(AppDestination.dashboard.displayName, systemImage: AppDestination.dashboard.systemImage, value: .dashboard) {
+                NavigationStack {
+                    DashboardContainer()
+                        .navigationTitle("Dashboard")
+                        .hostTitleMenu()
+                }
+            }
             Tab(AppDestination.containers.displayName, systemImage: AppDestination.containers.systemImage, value: .containers) {
                 ContainersTab()
             }
+            Tab(AppDestination.terminals.displayName, systemImage: AppDestination.terminals.systemImage, value: .terminals) {
+                TerminalsTab()
+            }
             Tab(AppDestination.proxy.displayName, systemImage: AppDestination.proxy.systemImage, value: .proxy) {
                 ProxyTab()
-            }
-            Tab(AppDestination.stacks.displayName, systemImage: AppDestination.stacks.systemImage, value: .stacks) {
-                StacksTab()
-            }
-            Tab(AppDestination.ssh.displayName, systemImage: AppDestination.ssh.systemImage, value: .ssh) {
-                SSHTab()
             }
             Tab(AppDestination.more.displayName, systemImage: AppDestination.more.systemImage, value: .more) {
                 MoreTab()
@@ -195,7 +199,7 @@ struct AppRootView: View {
             return
         }
         isInWelcomeFlow = false
-        selection = .ssh
+        selection = .terminals
         sshSessionStore.focusSession()
         isShowingSSHSession = true
     }

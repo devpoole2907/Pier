@@ -41,29 +41,7 @@ struct SSHProfileListView: View {
 
     private var profileList: some View {
         List {
-            Section("Hosts") {
-            ForEach(profiles) { profile in
-                Button {
-                    openSession(profile)
-                } label: {
-                    profileRow(profile)
-                }
-                .buttonStyle(.plain)
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    Button {
-                        editTarget = profile
-                    } label: {
-                        Label("Edit", systemImage: "pencil")
-                    }
-                    .tint(.blue)
-                }
-                .contextMenu {
-                    Button("Edit", systemImage: "pencil") {
-                        editTarget = profile
-                    }
-                }
-            }
-        }
+            SSHHostsSection(profiles: profiles, openSession: openSession, editTarget: $editTarget)
         }
         #if os(iOS)
         .listStyle(.insetGrouped)
@@ -78,56 +56,6 @@ struct SSHProfileListView: View {
                 endPoint: .center
             )
         )
-    }
-
-    private func profileRow(_ profile: SSHProfile) -> some View {
-        HStack(spacing: 14) {
-            // Icon
-            ZStack {
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(.green.opacity(0.14))
-                    .frame(width: 50, height: 50)
-                Image(systemName: "terminal.fill")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(.green)
-            }
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(profile.displayName)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(.primary)
-                Text("\(profile.username)@\(profile.hostDisplay)")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-
-            Spacer()
-
-            VStack(alignment: .trailing, spacing: 4) {
-                if sshSessionStore.sessions.contains(where: { $0.profile.id == profile.id && $0.connection.state == .connected }) {
-                    HStack(spacing: 2) {
-                        Image(systemName: "checkmark.circle.fill")
-                        Text("Connected")
-                    }
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.green.opacity(0.9))
-                } else {
-                    authBadge(profile.authType)
-                    if profile.knownHostFingerprint != nil {
-                        HStack(spacing: 2) {
-                            Image(systemName: "lock.shield.fill")
-                            Text("Verified")
-                        }
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(.green.opacity(0.9))
-                    }
-                }
-            }
-        }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 4)
-        .contentShape(Rectangle())
     }
 
     private var currentSessionCard: some View {
@@ -169,24 +97,6 @@ struct SSHProfileListView: View {
         }
         .padding(14)
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20))
-    }
-
-    @ViewBuilder
-    private func authBadge(_ type: SSHAuthType) -> some View {
-        let (icon, label): (String, String) = switch type {
-            case .password:   ("key.fill", "Password")
-            case .privateKey: ("doc.badge.gearshape.fill", "Key")
-        }
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.caption2.weight(.semibold))
-            Text(label)
-                .font(.caption2)
-        }
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 7)
-        .padding(.vertical, 3)
-            .background(.secondary.opacity(0.1), in: Capsule())
     }
 
     // MARK: - Empty state

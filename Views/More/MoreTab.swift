@@ -4,8 +4,8 @@ import SwiftUI
 enum MoreDestination: Hashable {
     case servers
     case alerts
+    case stacks
     case deployments
-    case procedures
     case variables
     case images
     case settings
@@ -14,8 +14,8 @@ enum MoreDestination: Hashable {
 enum MoreDestinationAccent {
     case servers
     case alerts
+    case stacks
     case deployments
-    case procedures
     case variables
     case images
     case settings
@@ -24,8 +24,8 @@ enum MoreDestinationAccent {
         switch self {
         case .servers: .blue
         case .alerts: .red
+        case .stacks: .indigo
         case .deployments: .teal
-        case .procedures: .purple
         case .variables: .brown
         case .images: .orange
         case .settings: .secondary
@@ -53,6 +53,10 @@ struct MoreTab: View {
                 }
 
                 Section("Resources") {
+                    NavigationLink(value: MoreDestination.stacks) {
+                        moreRow(icon: "square.stack.3d.up.fill", color: MoreDestinationAccent.stacks.color,
+                                title: "Stacks", subtitle: "Compose stacks and services")
+                    }
                     NavigationLink(value: MoreDestination.deployments) {
                         moreRow(icon: "shippingbox.fill", color: MoreDestinationAccent.deployments.color,
                                 title: "Deployments", subtitle: "Single-container deployments")
@@ -64,13 +68,6 @@ struct MoreTab: View {
                     NavigationLink(value: MoreDestination.variables) {
                         moreRow(icon: "curlybraces", color: MoreDestinationAccent.variables.color,
                                 title: "Variables", subtitle: "Global variables and secrets")
-                    }
-                }
-
-                Section("Automation") {
-                    NavigationLink(value: MoreDestination.procedures) {
-                        moreRow(icon: "list.bullet.rectangle.fill", color: MoreDestinationAccent.procedures.color,
-                                title: "Procedures", subtitle: "Run multi-stage automations")
                     }
                 }
 
@@ -108,6 +105,15 @@ struct MoreTab: View {
                 .hostTitleMenu()
                 .moreDestinationTitleStyle()
                 .moreDestinationBackground(.alerts)
+        case .stacks:
+            StacksContainer()
+                .navigationTitle("Stacks")
+                .hostTitleMenu()
+                .navigationDestination(for: Stack.self) { stack in
+                    StackDetailContainer(stack: stack)
+                }
+                .moreDestinationTitleStyle()
+                .moreDestinationBackground(.stacks)
         case .deployments:
             DeploymentsContainer()
                 .navigationTitle("Deployments")
@@ -115,12 +121,6 @@ struct MoreTab: View {
                 .serverScopeMenu()
                 .moreDestinationTitleStyle()
                 .moreDestinationBackground(.deployments)
-        case .procedures:
-            ProceduresContainer()
-                .navigationTitle("Procedures")
-                .hostTitleMenu()
-                .moreDestinationTitleStyle()
-                .moreDestinationBackground(.procedures)
         case .variables:
             VariablesContainer()
                 .navigationTitle("Variables")

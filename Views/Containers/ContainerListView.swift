@@ -17,23 +17,33 @@ struct ContainerListView: View {
     }
 
     var body: some View {
-        Group {
-            if viewModel.containers.isEmpty, viewModel.isLoading {
-                LoadingView(message: "Loading containers…")
-            } else if let error = viewModel.loadError, viewModel.containers.isEmpty {
-                ErrorView(error: error, retry: {
-                    Task { await viewModel.load(includeStopped: showStoppedContainers) }
-                })
-            } else if viewModel.containers.isEmpty {
-                EmptyStateView(
-                    title: "No containers",
-                    systemImage: "shippingbox",
-                    message: "This host has no Docker containers yet."
+        VStack(spacing: 0) {
+            if hostManager.servers.count > 1 {
+                TrawlSegmentBar(
+                    "Server scope",
+                    selection: serverScopeBinding,
+                    items: serverScopeItems
                 )
-            } else if viewModel.visibleContainers.isEmpty {
-                ContentUnavailableView.search
-            } else {
-                contentList
+            }
+
+            Group {
+                if viewModel.containers.isEmpty, viewModel.isLoading {
+                    LoadingView(message: "Loading containers…")
+                } else if let error = viewModel.loadError, viewModel.containers.isEmpty {
+                    ErrorView(error: error, retry: {
+                        Task { await viewModel.load(includeStopped: showStoppedContainers) }
+                    })
+                } else if viewModel.containers.isEmpty {
+                    EmptyStateView(
+                        title: "No containers",
+                        systemImage: "shippingbox",
+                        message: "This host has no Docker containers yet."
+                    )
+                } else if viewModel.visibleContainers.isEmpty {
+                    ContentUnavailableView.search
+                } else {
+                    contentList
+                }
             }
         }
         .environment(\.editMode, $editMode)
@@ -128,6 +138,20 @@ struct ContainerListView: View {
                 }
             }
         }
+    }
+
+    private var serverScopeBinding: Binding<String?> {
+        Binding(
+            get: { hostManager.activeServerID },
+            set: { hostManager.setActiveServer($0) }
+        )
+    }
+
+    private var serverScopeItems: [TrawlSegmentBarItem<String?>] {
+        [TrawlSegmentBarItem("All", value: nil)]
+            + hostManager.servers.map { server in
+                TrawlSegmentBarItem(server.name, value: server.id)
+            }
     }
 
     private var selectionSubtitle: String? {

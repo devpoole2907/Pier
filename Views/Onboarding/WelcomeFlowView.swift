@@ -51,7 +51,7 @@ struct WelcomeFlowView: View {
                     description: "Start, stop, inspect, and monitor containers"
                 )
                 WelcomeFeatureRow(
-                    icon: AppDestination.stacks.systemImage,
+                    icon: "square.stack.3d.up.fill",
                     color: .indigo,
                     title: "Stacks",
                     description: "Review Compose stacks and service health"
