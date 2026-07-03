@@ -1,9 +1,7 @@
 import SwiftUI
 
 /// A single addressable Komodo terminal target — a server, container, stack, or deployment the
-/// user can open a terminal against. Scaffolding only: opening one currently presents
-/// `KomodoTerminalPlaceholderView` rather than a live connection (see that file for the intended
-/// follow-up implementation).
+/// user can open a live terminal against (see `KomodoTerminalConnection` and `KomodoTerminalView`).
 struct KomodoTerminalTarget: Identifiable, Hashable {
     enum Kind: String, CaseIterable, Identifiable {
         case server
@@ -45,6 +43,15 @@ struct KomodoTerminalTarget: Identifiable, Hashable {
     let resourceID: String
     let name: String
     let subtitle: String
+
+    /// The server a Container target lives on. Required (alongside `name`, the container's Docker
+    /// name) to build the terminal websocket URL's `target[params][server]` — Container is the
+    /// only kind whose Komodo API params need more than the resource's own id.
+    var serverID: String? = nil
+
+    /// The compose service to attach to for a Stack target's `target[params][service]`.
+    /// Typically the stack's first service; empty if the stack has none.
+    var serviceName: String? = nil
 
     var id: String { "\(kind.rawValue):\(resourceID)" }
 }

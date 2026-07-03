@@ -82,7 +82,8 @@ struct KomodoTerminalConfigSheet: View {
                     kind: .container,
                     resourceID: $0.id,
                     name: $0.displayName,
-                    subtitle: "\(serverName(for: $0.serverID)) • \($0.status)"
+                    subtitle: "\(serverName(for: $0.serverID)) • \($0.status)",
+                    serverID: $0.serverID
                 )
             }
         case .stack:
@@ -91,7 +92,8 @@ struct KomodoTerminalConfigSheet: View {
                     kind: .stack,
                     resourceID: $0.id,
                     name: $0.name,
-                    subtitle: "\(serverName(for: $0.serverID)) • \($0.state.label)"
+                    subtitle: "\(serverName(for: $0.serverID)) • \($0.state.label)",
+                    serviceName: $0.services.first?.service
                 )
             }
         case .deployment:

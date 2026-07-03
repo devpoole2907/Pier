@@ -12,10 +12,17 @@ enum TerminalsFilter: Hashable {
     case deployment
 }
 
+/// Pairs a Komodo terminal target with the host it belongs to, so the sheet that presents
+/// `KomodoTerminalView` has everything it needs to build a connection.
+private struct KomodoTerminalPresentation: Identifiable {
+    let host: Host
+    let target: KomodoTerminalTarget
+    var id: String { target.id }
+}
+
 /// Unified "Terminals" tab: SSH hosts (existing functionality, unchanged) alongside Komodo
-/// terminal targets (server/container/stack/deployment). Komodo terminals are UI scaffolding only
-/// right now — opening one presents `KomodoTerminalPlaceholderView` rather than a live connection;
-/// see that file for the intended websocket/SwiftTerm implementation.
+/// terminal targets (server/container/stack/deployment), each opening a live `KomodoTerminalView`
+/// backed by `KomodoTerminalConnection`.
 struct TerminalsTab: View {
     @Environment(SSHSessionStore.self) private var sshSessionStore
     @Environment(HostManager.self) private var hostManager
@@ -31,8 +38,8 @@ struct TerminalsTab: View {
     @State private var showAddSSHSheet = false
     @State private var editSSHProfile: SSHProfile?
 
-    // Komodo terminal placeholder + "+" menu config sheets.
-    @State private var komodoTerminalTarget: KomodoTerminalTarget?
+    // Komodo terminal session + "+" menu config sheets.
+    @State private var komodoTerminalPresentation: KomodoTerminalPresentation?
     @State private var komodoConfigKind: KomodoTerminalTarget.Kind?
 
     var body: some View {
@@ -69,8 +76,11 @@ struct TerminalsTab: View {
         .sheet(item: $editSSHProfile) { profile in
             SSHProfileEditSheet(existing: profile)
         }
-        .sheet(item: $komodoTerminalTarget) { target in
-            KomodoTerminalPlaceholderView(target: target)
+        .sheet(item: $komodoTerminalPresentation) { presentation in
+            KomodoTerminalView(host: presentation.host, target: presentation.target)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
         }
         .sheet(item: $komodoConfigKind) { kind in
             KomodoTerminalConfigSheet(
@@ -79,7 +89,7 @@ struct TerminalsTab: View {
                 resources: komodoResources
             ) { target in
                 komodoConfigKind = nil
-                komodoTerminalTarget = target
+                openKomodoTerminal(target)
             }
         }
     }
@@ -124,12 +134,12 @@ struct TerminalsTab: View {
             } else {
                 ForEach(hostManager.servers) { server in
                     Button {
-                        komodoTerminalTarget = KomodoTerminalTarget(
+                        openKomodoTerminal(KomodoTerminalTarget(
                             kind: .server,
                             resourceID: server.id,
                             name: server.name,
                             subtitle: server.state.label
-                        )
+                        ))
                     } label: {
                         KomodoTerminalRowView(icon: "server.rack", name: server.name, subtitle: server.state.label)
                     }
@@ -149,12 +159,13 @@ struct TerminalsTab: View {
             } else {
                 ForEach(komodoResources.containers) { container in
                     Button {
-                        komodoTerminalTarget = KomodoTerminalTarget(
+                        openKomodoTerminal(KomodoTerminalTarget(
                             kind: .container,
                             resourceID: container.id,
                             name: container.displayName,
-                            subtitle: containerSubtitle(container)
-                        )
+                            subtitle: containerSubtitle(container),
+                            serverID: container.serverID
+                        ))
                     } label: {
                         KomodoTerminalRowView(
                             icon: "shippingbox",
@@ -179,12 +190,13 @@ struct TerminalsTab: View {
                 ForEach(komodoResources.stacks) { stack in
                     let subtitle = "\(serverName(for: stack.serverID)) • \(stack.state.label)"
                     Button {
-                        komodoTerminalTarget = KomodoTerminalTarget(
+                        openKomodoTerminal(KomodoTerminalTarget(
                             kind: .stack,
                             resourceID: stack.id,
                             name: stack.name,
-                            subtitle: subtitle
-                        )
+                            subtitle: subtitle,
+                            serviceName: stack.services.first?.service
+                        ))
                     } label: {
                         KomodoTerminalRowView(icon: "square.stack.3d.up", name: stack.name, subtitle: subtitle)
                     }
@@ -205,12 +217,12 @@ struct TerminalsTab: View {
                 ForEach(komodoResources.deployments) { deployment in
                     let subtitle = "\(serverName(for: deployment.serverID)) • \(deployment.state.label)"
                     Button {
-                        komodoTerminalTarget = KomodoTerminalTarget(
+                        openKomodoTerminal(KomodoTerminalTarget(
                             kind: .deployment,
                             resourceID: deployment.id,
                             name: deployment.name,
                             subtitle: subtitle
-                        )
+                        ))
                     } label: {
                         KomodoTerminalRowView(icon: "arrow.up.forward.app", name: deployment.name, subtitle: subtitle)
                     }
@@ -267,6 +279,13 @@ struct TerminalsTab: View {
             return
         }
         await komodoResources.load(client: client)
+    }
+
+    /// Opens a live terminal for the given target on the active host. A no-op if there's
+    /// somehow no active host — the Komodo sections/menu are only shown while one is active.
+    private func openKomodoTerminal(_ target: KomodoTerminalTarget) {
+        guard let host = hostManager.activeClient(in: modelContext)?.host else { return }
+        komodoTerminalPresentation = KomodoTerminalPresentation(host: host, target: target)
     }
 
     // MARK: - Helpers
