@@ -1,22 +1,19 @@
 import Foundation
 import SwiftData
 
-/// A saved Portainer host. Credentials live in the Keychain, keyed by `id`.
+/// A saved Komodo Core connection. Credentials (API key + secret) live in the Keychain, keyed by `id`.
 @Model
 final class Host {
-    /// Stable identifier used as the Keychain account key for the JWT.
+    /// Stable identifier used as the Keychain account key for the API key/secret.
     var id: UUID = UUID()
 
     /// Friendly display name shown in lists, e.g. "Home Server".
     var name: String = ""
 
-    /// Base URL of the Portainer instance, e.g. https://10.0.0.5:9443
+    /// Base URL of the Komodo Core instance, e.g. http://10.0.0.5:9120
     var baseURL: String = ""
 
-    /// Username for authentication. JWT and optional password re-auth credentials are stored in the Keychain.
-    var username: String = ""
-
-    /// Whether HTTPS certificate validation should be skipped. Some self-signed local Portainer installs need this.
+    /// Whether HTTPS certificate validation should be skipped. Some self-signed local Komodo installs need this.
     var allowsInsecureTLS: Bool = false
 
     /// Date this host was added.
@@ -26,14 +23,12 @@ final class Host {
         id: UUID = UUID(),
         name: String,
         baseURL: String,
-        username: String,
         allowsInsecureTLS: Bool = false,
         createdAt: Date = .now
     ) {
         self.id = id
         self.name = name
         self.baseURL = baseURL
-        self.username = username
         self.allowsInsecureTLS = allowsInsecureTLS
         self.createdAt = createdAt
     }

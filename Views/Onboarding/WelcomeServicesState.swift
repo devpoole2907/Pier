@@ -1,11 +1,11 @@
 import Foundation
 
 struct WelcomeServicesState {
-    var portainer: Bool
+    var komodo: Bool
     var nginxProxyManager: Bool
     var ssh: Bool
 
     var hasAny: Bool {
-        portainer || nginxProxyManager || ssh
+        komodo || nginxProxyManager || ssh
     }
 }

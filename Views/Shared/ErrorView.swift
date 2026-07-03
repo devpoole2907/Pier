@@ -9,7 +9,7 @@ struct ErrorView: View {
     let secondaryAction: (() -> Void)?
 
     init(
-        error: PortainerError,
+        error: KomodoError,
         retry: (() -> Void)? = nil,
         secondaryActionTitle: String? = nil,
         secondaryAction: (() -> Void)? = nil
@@ -50,5 +50,5 @@ struct ErrorView: View {
 }
 
 #Preview {
-    ErrorView(error: PortainerError.unauthorized, retry: { })
+    ErrorView(error: KomodoError.unauthorized, retry: { })
 }

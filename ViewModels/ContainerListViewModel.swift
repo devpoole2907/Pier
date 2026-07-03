@@ -6,7 +6,7 @@ enum ContainerFilter: String, CaseIterable, Identifiable, Sendable {
     case all
     case running
     case stopped
-    case byStack
+    case byServer
 
     var id: String { rawValue }
 
@@ -15,7 +15,7 @@ enum ContainerFilter: String, CaseIterable, Identifiable, Sendable {
         case .all: "All"
         case .running: "Running"
         case .stopped: "Stopped"
-        case .byStack: "By stack"
+        case .byServer: "By server"
         }
     }
 }
@@ -25,20 +25,28 @@ enum ContainerFilter: String, CaseIterable, Identifiable, Sendable {
 final class ContainerListViewModel {
     private(set) var containers: [Container] = []
     private(set) var isLoading = false
-    private(set) var loadError: PortainerError?
+    private(set) var loadError: KomodoError?
     private(set) var actionStatesByContainerID: [String: ContainerActionState] = [:]
 
     var filter: ContainerFilter = .all
     var searchText: String = ""
     var pendingDestructiveAction: PendingContainerAction?
 
-    private let client: PortainerClient
-    private let endpointID: Int
+    private let client: KomodoClient
+    /// Scopes the list to a single Komodo server, or `nil` for "All servers".
+    private let serverID: String?
     private var includesStopped = true
 
-    init(client: PortainerClient, endpointID: Int) {
+    init(client: KomodoClient, serverID: String?) {
         self.client = client
-        self.endpointID = endpointID
+        self.serverID = serverID
+    }
+
+    /// `containers` filtered by the "show stopped containers" app setting. Komodo's list endpoints
+    /// have no server-side "include stopped" flag (unlike the previous backend's call), so this is now
+    /// applied client-side rather than by varying the network request.
+    private var scopedContainers: [Container] {
+        includesStopped ? containers : containers.filter { $0.state == .running }
     }
 
     /// Filtered + grouped (running before stopped) view of `containers` honouring the active filter and search.
@@ -46,12 +54,12 @@ final class ContainerListViewModel {
         let trimmed = searchText.trimmingCharacters(in: .whitespaces)
         let base: [Container]
         switch filter {
-        case .all, .byStack:
-            base = containers
+        case .all, .byServer:
+            base = scopedContainers
         case .running:
-            base = containers.filter { $0.state == .running }
+            base = scopedContainers.filter { $0.state == .running }
         case .stopped:
-            base = containers.filter { $0.state != .running }
+            base = scopedContainers.filter { $0.state != .running }
         }
         let searched = trimmed.isEmpty
             ? base
@@ -67,9 +75,11 @@ final class ContainerListViewModel {
         }
     }
 
-    /// Containers grouped by stack name (for the "By stack" filter view).
-    var containersByStack: [(String, [Container])] {
-        let grouped = Dictionary(grouping: visibleContainers) { $0.stackName ?? "Standalone" }
+    /// Containers grouped by server ID (for the "By server" filter view). Komodo containers don't
+    /// carry a compose-project name on the list item, so grouping is by server rather than by
+    /// compose stack; the view resolves each server's display name via `HostManager.servers`.
+    var containersByServer: [(String, [Container])] {
+        let grouped = Dictionary(grouping: visibleContainers) { $0.serverID }
         return grouped
             .map { ($0.key, $0.value) }
             .sorted { $0.0.localizedStandardCompare($1.0) == .orderedAscending }
@@ -80,10 +90,10 @@ final class ContainerListViewModel {
         isLoading = true
         defer { isLoading = false }
         do {
-            self.containers = try await client.listContainers(endpointID: endpointID, includeStopped: includeStopped)
+            self.containers = try await client.listContainers(serverID: serverID)
             self.loadError = nil
         } catch {
-            self.loadError = PortainerError.from(error)
+            self.loadError = KomodoError.from(error)
         }
     }
 
@@ -93,7 +103,8 @@ final class ContainerListViewModel {
 
     /// Long-running polling loop. Returns when the surrounding task is cancelled.
     /// Drive this from a view's `.task(id:)` so cancellation flows naturally on view disappearance
-    /// or interval change.
+    /// or interval change. Since stats are inline on `Container`, this refresh also keeps the
+    /// per-container CPU%/mem shown in list rows current.
     func runPolling(every seconds: TimeInterval, includeStopped: Bool = true) async {
         while !Task.isCancelled {
             try? await Task.sleep(for: .seconds(seconds))
@@ -106,7 +117,7 @@ final class ContainerListViewModel {
 
     func start(_ container: Container) async {
         await performAction(for: container, actionState: .starting) {
-            try await self.client.startContainer(endpointID: self.endpointID, containerID: container.id)
+            try await self.client.startContainer(serverID: container.serverID, containerID: container.id)
         }
     }
 
@@ -129,29 +140,32 @@ final class ContainerListViewModel {
     func confirmDestructiveAction() async {
         guard let pending = pendingDestructiveAction else { return }
         pendingDestructiveAction = nil
+        let container = pending.container
         switch pending.action {
         case .stop:
-            await performAction(for: pending.container, actionState: .stopping) {
-                try await self.client.stopContainer(endpointID: self.endpointID, containerID: pending.container.id)
+            await performAction(for: container, actionState: .stopping) {
+                try await self.client.stopContainer(serverID: container.serverID, containerID: container.id)
             }
         case .restart:
-            await performAction(for: pending.container, actionState: .restarting) {
-                try await self.client.restartContainer(endpointID: self.endpointID, containerID: pending.container.id)
+            await performAction(for: container, actionState: .restarting) {
+                try await self.client.restartContainer(serverID: container.serverID, containerID: container.id)
             }
         case .kill:
-            await performAction(for: pending.container, actionState: .killing) {
-                try await self.client.killContainer(endpointID: self.endpointID, containerID: pending.container.id)
+            await performAction(for: container, actionState: .killing) {
+                // Komodo has no dedicated "kill" call; a SIGKILL stop with no grace period is the
+                // equivalent of the old "kill" action.
+                try await self.client.stopContainer(serverID: container.serverID, containerID: container.id, signal: "SIGKILL", time: 0)
             }
         case .delete:
-            await performAction(for: pending.container, actionState: .deleting) {
-                try await self.client.deleteContainer(endpointID: self.endpointID, containerID: pending.container.id, force: true, removeVolumes: false)
+            await performAction(for: container, actionState: .deleting) {
+                try await self.client.destroyContainer(serverID: container.serverID, containerID: container.id)
             }
         }
     }
 
     func start(_ containers: [Container]) async {
         await performActions(containers, actionState: .starting) { container in
-            try await self.client.startContainer(endpointID: self.endpointID, containerID: container.id)
+            try await self.client.startContainer(serverID: container.serverID, containerID: container.id)
         }
     }
 
@@ -159,13 +173,13 @@ final class ContainerListViewModel {
         await performActions(containers, actionState: ContainerActionState(action: action)) { container in
             switch action {
             case .stop:
-                try await self.client.stopContainer(endpointID: self.endpointID, containerID: container.id)
+                try await self.client.stopContainer(serverID: container.serverID, containerID: container.id)
             case .restart:
-                try await self.client.restartContainer(endpointID: self.endpointID, containerID: container.id)
+                try await self.client.restartContainer(serverID: container.serverID, containerID: container.id)
             case .kill:
-                try await self.client.killContainer(endpointID: self.endpointID, containerID: container.id)
+                try await self.client.stopContainer(serverID: container.serverID, containerID: container.id, signal: "SIGKILL", time: 0)
             case .delete:
-                try await self.client.deleteContainer(endpointID: self.endpointID, containerID: container.id, force: true, removeVolumes: false)
+                try await self.client.destroyContainer(serverID: container.serverID, containerID: container.id)
             }
         }
     }
@@ -189,7 +203,7 @@ final class ContainerListViewModel {
             try await body()
             await load(includeStopped: includesStopped)
         } catch {
-            self.loadError = PortainerError.from(error)
+            self.loadError = KomodoError.from(error)
         }
     }
 
@@ -212,7 +226,7 @@ final class ContainerListViewModel {
             }
             await load(includeStopped: includesStopped)
         } catch {
-            self.loadError = PortainerError.from(error)
+            self.loadError = KomodoError.from(error)
         }
     }
 }

@@ -10,9 +10,8 @@ struct ContainerDetailContent: View {
         List {
             ContainerDetailHeader(detail: detail, displayName: viewModel.displayName)
             ContainerStatsSection(
-                client: viewModel.portainerClient,
-                endpointID: viewModel.resolvedEndpointID,
-                containerID: viewModel.containerID,
+                stats: viewModel.liveStats,
+                cpuHistory: viewModel.cpuHistory,
                 isRunning: detail.state.running
             )
             ContainerEnvironmentSection(environment: viewModel.environment)

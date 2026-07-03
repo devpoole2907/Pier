@@ -39,14 +39,14 @@ struct WelcomeFlowView: View {
 
             VStack(alignment: .leading, spacing: 16) {
                 WelcomeFeatureRow(
-                    icon: PierServiceIdentity.portainer.systemImage,
-                    color: PierServiceIdentity.portainer.brandColor,
-                    title: "Portainer",
+                    icon: PierServiceIdentity.komodo.systemImage,
+                    color: PierServiceIdentity.komodo.brandColor,
+                    title: "Komodo",
                     description: "Connect to your Docker control plane"
                 )
                 WelcomeFeatureRow(
                     icon: AppDestination.containers.systemImage,
-                    color: PierServiceIdentity.portainer.brandColor,
+                    color: PierServiceIdentity.komodo.brandColor,
                     title: "Containers",
                     description: "Start, stop, inspect, and monitor containers"
                 )
@@ -96,13 +96,13 @@ struct WelcomeFlowView: View {
 
                 VStack(spacing: 12) {
                     WelcomeSetupRow(
-                        icon: PierServiceIdentity.portainer.systemImage,
-                        color: PierServiceIdentity.portainer.brandColor,
-                        title: PierServiceIdentity.portainer.displayName,
-                        description: "Manage containers, stacks, images, and stats",
-                        isConfigured: configuredServices.portainer
+                        icon: PierServiceIdentity.komodo.systemImage,
+                        color: PierServiceIdentity.komodo.brandColor,
+                        title: PierServiceIdentity.komodo.displayName,
+                        description: "Manage servers, containers, stacks, and stats",
+                        isConfigured: configuredServices.komodo
                     ) {
-                        setupTarget = .portainer
+                        setupTarget = .komodo
                     }
 
                     WelcomeSetupRow(

@@ -27,6 +27,6 @@ struct EmptyStateView: View {
     EmptyStateView(
         title: "No containers",
         systemImage: "shippingbox",
-        message: "This Portainer host has no Docker containers yet."
+        message: "This Komodo host has no Docker containers yet."
     )
 }

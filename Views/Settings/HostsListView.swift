@@ -20,7 +20,7 @@ struct HostsListView: View {
                 ContentUnavailableView {
                     Label("No hosts", systemImage: "externaldrive.badge.questionmark")
                 } description: {
-                    Text("Add your first Portainer host below.")
+                    Text("Add your first Komodo host below.")
                 }
             } else {
                 ForEach(hosts) { host in

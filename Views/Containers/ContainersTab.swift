@@ -13,6 +13,7 @@ struct ContainersTab: View {
             ContainerListContainer()
                 .navigationTitle("Containers")
                 .hostTitleMenu()
+                .serverScopeMenu()
                 .navigationDestination(for: ContainerNavigationValue.self) { value in
                     ContainerDetailContainer(navigationValue: value)
                 }
@@ -23,6 +24,7 @@ struct ContainersTab: View {
 /// The pair of values needed to push the detail screen. Identifiable for use with sheets, too.
 struct ContainerNavigationValue: Hashable, Identifiable {
     let containerID: String
+    let serverID: String
     let displayName: String
 
     var id: String { containerID }

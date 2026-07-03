@@ -28,13 +28,19 @@ struct ContainerRowView: View {
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
                 }
+                if let statsSummary {
+                    Text(statsSummary)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                }
             }
             Spacer(minLength: DesignSystem.Spacing.small)
             statusBadge
         }
         .padding(.vertical, DesignSystem.Spacing.tight)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(container.displayName), \(accessibilityStatusText), image \(container.image)")
+        .accessibilityLabel(accessibilityLabel)
     }
 
     private var statusText: String? {
@@ -44,8 +50,27 @@ struct ContainerRowView: View {
         return container.status.isEmpty ? nil : container.status
     }
 
+    /// Compact CPU%/mem summary from Komodo's inline stats snapshot - shown only for running
+    /// containers with a fresh snapshot, since raw strings are already display-ready.
+    private var statsSummary: String? {
+        guard actionState == nil, container.state == .running, let stats = container.stats else { return nil }
+        let parts = [
+            stats.cpuPercRaw.isEmpty ? nil : "\(stats.cpuPercRaw) CPU",
+            stats.memPercRaw.isEmpty ? nil : "\(stats.memPercRaw) mem"
+        ].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
     private var accessibilityStatusText: String {
         actionState?.displayName ?? container.state.displayName
+    }
+
+    private var accessibilityLabel: String {
+        var label = "\(container.displayName), \(accessibilityStatusText), image \(container.image)"
+        if let statsSummary {
+            label += ", \(statsSummary)"
+        }
+        return label
     }
 
     @ViewBuilder
@@ -69,7 +94,7 @@ struct SelectableContainerRow: View {
             ContainerRowView(container: container, actionState: actionState)
                 .tag(container.id)
         } else {
-            NavigationLink(value: ContainerNavigationValue(containerID: container.id, displayName: container.displayName)) {
+            NavigationLink(value: ContainerNavigationValue(containerID: container.id, serverID: container.serverID, displayName: container.displayName)) {
                 ContainerRowView(container: container, actionState: actionState)
             }
             .tag(container.id)

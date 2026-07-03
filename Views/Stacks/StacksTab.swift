@@ -21,8 +21,8 @@ struct StacksTab: View {
 /// Resolves the active host and presents the stacks list, or a no-host placeholder.
 struct StacksContainer: View {
     var body: some View {
-        ActiveHostGate { host, client, endpointID in
-            StacksListView(client: client, endpointID: endpointID)
+        ActiveHostGate { host, client in
+            StacksListView(client: client)
                 .id(host.id)
         }
     }
@@ -33,8 +33,8 @@ struct StackDetailContainer: View {
     let stack: Stack
 
     var body: some View {
-        ActiveHostGate { _, client, endpointID in
-            StackDetailView(stack: stack, client: client, endpointID: endpointID)
+        ActiveHostGate { _, client in
+            StackDetailView(stack: stack, client: client)
         }
     }
 }

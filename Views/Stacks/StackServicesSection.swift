@@ -14,7 +14,7 @@ struct StackServicesSection: View {
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(services) { container in
-                    NavigationLink(value: ContainerNavigationValue(containerID: container.id, displayName: container.displayName)) {
+                    NavigationLink(value: ContainerNavigationValue(containerID: container.id, serverID: container.serverID, displayName: container.displayName)) {
                         ContainerRowView(container: container, actionState: viewModel.actionState(for: container))
                     }
                     .disabled(viewModel.isActionInProgress(for: container))

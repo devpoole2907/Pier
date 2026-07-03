@@ -1,60 +1,60 @@
 import Foundation
 import Security
 
-/// Thin wrapper around the iOS Keychain for storing per-host Portainer credentials.
+/// Thin wrapper around the iOS Keychain for storing per-host Komodo credentials.
 enum KeychainService {
-    nonisolated private static let tokenService = "com.poole.james.pier.jwt"
-    nonisolated private static let passwordService = "com.poole.james.pier.password"
+    nonisolated private static let apiKeyService = "com.poole.james.pier.komodo.apikey"
+    nonisolated private static let apiSecretService = "com.poole.james.pier.komodo.apisecret"
 
-    /// Stores a token. Replaces any existing entry for the same account.
-    nonisolated static func store(token: String, for hostID: UUID) throws {
+    /// Stores an API key. Replaces any existing entry for the same account.
+    nonisolated static func store(apiKey: String, for hostID: UUID) throws {
         try KeychainStore.store(
-            value: token,
-            service: tokenService,
+            value: apiKey,
+            service: apiKeyService,
             account: hostID.uuidString,
             accessibility: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         )
     }
 
-    /// Retrieves a token, or returns nil if none is stored.
-    nonisolated static func token(for hostID: UUID) throws -> String? {
-        try KeychainStore.value(service: tokenService, account: hostID.uuidString)
+    /// Retrieves an API key, or returns nil if none is stored.
+    nonisolated static func apiKey(for hostID: UUID) throws -> String? {
+        try KeychainStore.value(service: apiKeyService, account: hostID.uuidString)
     }
 
-    /// Stores the Portainer password for silent re-auth after app relaunch.
-    nonisolated static func store(password: String, for hostID: UUID) throws {
+    /// Stores an API secret. Replaces any existing entry for the same account.
+    nonisolated static func store(apiSecret: String, for hostID: UUID) throws {
         try KeychainStore.store(
-            value: password,
-            service: passwordService,
+            value: apiSecret,
+            service: apiSecretService,
             account: hostID.uuidString,
             accessibility: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         )
     }
 
-    /// Retrieves a password, or returns nil if none is stored.
-    nonisolated static func password(for hostID: UUID) throws -> String? {
-        try KeychainStore.value(service: passwordService, account: hostID.uuidString)
+    /// Retrieves an API secret, or returns nil if none is stored.
+    nonisolated static func apiSecret(for hostID: UUID) throws -> String? {
+        try KeychainStore.value(service: apiSecretService, account: hostID.uuidString)
     }
 
     /// Deletes the stored credentials for a host. Safe to call when nothing is stored.
     nonisolated static func delete(for hostID: UUID) throws {
-        var tokenError: Error?
-        var passwordError: Error?
+        var keyError: Error?
+        var secretError: Error?
 
         do {
-            try KeychainStore.delete(service: tokenService, account: hostID.uuidString)
+            try KeychainStore.delete(service: apiKeyService, account: hostID.uuidString)
         } catch {
-            tokenError = error
+            keyError = error
         }
 
         do {
-            try KeychainStore.delete(service: passwordService, account: hostID.uuidString)
+            try KeychainStore.delete(service: apiSecretService, account: hostID.uuidString)
         } catch {
-            passwordError = error
+            secretError = error
         }
 
         // Throw the first error encountered, if any
-        if let error = tokenError ?? passwordError {
+        if let error = keyError ?? secretError {
             throw error
         }
     }

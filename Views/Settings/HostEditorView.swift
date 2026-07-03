@@ -4,7 +4,7 @@ import OSLog
 
 private let hostEditorLogger = Logger(subsystem: "com.poole.james.pier", category: "hosts.editor")
 
-/// Add/edit a Portainer host. Tests the connection before saving so the user knows credentials work.
+/// Add/edit a Komodo host. Tests the connection before saving so the user knows the API key/secret work.
 struct HostEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -12,8 +12,8 @@ struct HostEditorView: View {
 
     @State private var name: String
     @State private var baseURL: String
-    @State private var username: String
-    @State private var password: String = ""
+    @State private var apiKey: String = ""
+    @State private var apiSecret: String = ""
     @State private var allowsInsecureTLS: Bool
     @State private var connectionTest: ConnectionTestState = .idle
     @FocusState private var focusedField: Field?
@@ -24,13 +24,12 @@ struct HostEditorView: View {
     init(host: Host?) {
         self.existingHost = host
         _name = State(initialValue: host?.name ?? "")
-        _baseURL = State(initialValue: host?.baseURL ?? "https://")
-        _username = State(initialValue: host?.username ?? "admin")
+        _baseURL = State(initialValue: host?.baseURL ?? "http://")
         _allowsInsecureTLS = State(initialValue: host?.allowsInsecureTLS ?? false)
     }
 
     enum Field: Hashable {
-        case name, baseURL, username, password
+        case name, baseURL, apiKey, apiSecret
     }
 
     enum ConnectionTestState: Equatable {
@@ -51,7 +50,7 @@ struct HostEditorView: View {
                     #endif
                     .onSubmit { focusedField = .baseURL }
 
-                TextField("Base URL", text: $baseURL, prompt: Text("https://10.0.0.5:9443"))
+                TextField("Base URL", text: $baseURL, prompt: Text("http://10.0.0.5:9120"))
                     .focused($focusedField, equals: .baseURL)
                     #if os(iOS)
                     .textInputAutocapitalization(.never)
@@ -61,7 +60,7 @@ struct HostEditorView: View {
                     #if os(iOS)
                     .submitLabel(.next)
                     #endif
-                    .onSubmit { focusedField = .username }
+                    .onSubmit { focusedField = .apiKey }
                     .onChange(of: baseURL) { _, newValue in
                         urlValidationMessage = validateURL(newValue)
                     }
@@ -78,8 +77,8 @@ struct HostEditorView: View {
             }
 
             Section("Credentials") {
-                TextField("Username", text: $username)
-                    .focused($focusedField, equals: .username)
+                TextField("API Key", text: $apiKey)
+                    .focused($focusedField, equals: .apiKey)
                     #if os(iOS)
                     .textInputAutocapitalization(.never)
                     #endif
@@ -87,10 +86,10 @@ struct HostEditorView: View {
                     #if os(iOS)
                     .submitLabel(.next)
                     #endif
-                    .onSubmit { focusedField = .password }
+                    .onSubmit { focusedField = .apiSecret }
 
-                SecureField("Password", text: $password)
-                    .focused($focusedField, equals: .password)
+                SecureField("API Secret", text: $apiSecret)
+                    .focused($focusedField, equals: .apiSecret)
                     #if os(iOS)
                     .submitLabel(.go)
                     #endif
@@ -114,7 +113,7 @@ struct HostEditorView: View {
         .toolbar { toolbarContent }
         .onAppear {
             if focusedField == nil {
-                focusedField = name.isEmpty ? .name : .password
+                focusedField = name.isEmpty ? .name : .apiSecret
             }
         }
     }
@@ -153,14 +152,13 @@ struct HostEditorView: View {
     }
 
     private var canTest: Bool {
-        !baseURL.isEmpty && !username.isEmpty && !password.isEmpty && connectionTest != .testing
+        !baseURL.isEmpty && !apiKey.isEmpty && !apiSecret.isEmpty && connectionTest != .testing
     }
 
     private var canSave: Bool {
         !name.isEmpty
             && !baseURL.isEmpty
-            && !username.isEmpty
-            && (existingHost != nil || !password.isEmpty)
+            && (existingHost != nil || (!apiKey.isEmpty && !apiSecret.isEmpty))
             && connectionTest != .testing
     }
 
@@ -182,20 +180,23 @@ struct HostEditorView: View {
 
     private func testConnection() async {
         connectionTest = .testing
-        hostEditorLogger.info("Testing Portainer connection for username \(username, privacy: .private)")
+        hostEditorLogger.info("Testing Komodo connection")
         do {
             let candidate = Host(
                 name: name.isEmpty ? "Test" : name,
                 baseURL: baseURL,
-                username: username,
                 allowsInsecureTLS: allowsInsecureTLS
             )
-            let client = try PortainerClient(host: candidate, password: password, allowsInsecureTLS: allowsInsecureTLS)
-            try await client.authenticate(password: password)
-            _ = try await client.listEndpoints()
+            let client = try KomodoClient(
+                host: candidate,
+                apiKey: apiKey,
+                apiSecret: apiSecret,
+                allowsInsecureTLS: allowsInsecureTLS
+            )
+            _ = try await client.testConnection()
             connectionTest = .success
             hostEditorLogger.info("Connection test succeeded")
-        } catch let error as PortainerError {
+        } catch let error as KomodoError {
             connectionTest = .failure(connectionFailureMessage(for: error))
             hostEditorLogger.error("Connection test failed: \(error.localizedDescription, privacy: .private)")
         } catch {
@@ -208,33 +209,31 @@ struct HostEditorView: View {
         hostEditorLogger.info("Saving host configuration")
         do {
             let host: Host
+            let hasNewCredentials = !apiKey.isEmpty && !apiSecret.isEmpty
+
             if let existing = existingHost {
                 existing.name = name
                 existing.baseURL = baseURL
-                existing.username = username
                 existing.allowsInsecureTLS = allowsInsecureTLS
                 host = existing
             } else {
                 host = Host(
                     name: name,
                     baseURL: baseURL,
-                    username: username,
                     allowsInsecureTLS: allowsInsecureTLS
                 )
-                try await hostManager.authenticate(host: host, password: password)
                 modelContext.insert(host)
             }
 
             hostManager.invalidateClient(for: host)
-            try modelContext.save()
-            // If a password was supplied, authenticate so we have a JWT cached before dismissing.
-            if existingHost != nil, !password.isEmpty {
-                try await hostManager.authenticate(host: host, password: password)
+            if hasNewCredentials {
+                try await hostManager.authenticate(host: host, apiKey: apiKey, apiSecret: apiSecret)
             }
+            try modelContext.save()
             await hostManager.setActive(host)
             hostEditorLogger.info("Saved host configuration")
             dismiss()
-        } catch let error as PortainerError {
+        } catch let error as KomodoError {
             connectionTest = .failure(connectionFailureMessage(for: error))
             hostEditorLogger.error("Failed to save host configuration: \(error.localizedDescription, privacy: .private)")
         } catch {
@@ -243,13 +242,10 @@ struct HostEditorView: View {
         }
     }
 
-    private func connectionFailureMessage(for error: PortainerError) -> String {
+    private func connectionFailureMessage(for error: KomodoError) -> String {
         if case .serverError(_, let message) = error,
            let message {
-            let lowered = message.lowercased()
-            if lowered.contains("csrf token not found") || lowered.contains("origin invalid") {
-                return "Portainer rejected the request before API auth. Use the Portainer root URL, not a login page or /api path."
-            }
+            return message
         }
         return error.errorDescription ?? "Connection failed"
     }

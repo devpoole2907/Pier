@@ -1,43 +1,46 @@
 import Foundation
 
-/// A Docker image as returned by `GET /images/json`.
+/// A Docker image as returned by `/read/ListDockerImages`.
 /// Named `DockerImage` (not `Image`) to avoid colliding with `SwiftUI.Image`.
-struct DockerImage: Identifiable, Sendable, Decodable, Hashable {
+nonisolated struct DockerImage: Identifiable, Sendable, Hashable {
     let id: String
-    let repoTags: [String]
-    let repoDigests: [String]
+    let name: String
+    let tags: [String]
     let created: Date
     let size: Int64
-    let virtualSize: Int64?
-    let labels: [String: String]
-    let containers: Int
+    let inUse: Bool
 
-    /// Best human-readable label, falling back to the truncated image ID.
+    /// Best human-readable label: first non-`<none>` tag, else the short repo/tag `name`
+    /// Komodo already supplies, else a truncated digest.
     var displayName: String {
-        repoTags.first(where: { $0 != "<none>:<none>" }) ?? "untagged@\(id.replacingOccurrences(of: "sha256:", with: "").prefix(12))"
+        if let tag = tags.first(where: { $0 != "<none>:<none>" && !$0.isEmpty }) {
+            return tag
+        }
+        if name.hasPrefix("sha256:") {
+            return "untagged@\(name.replacingOccurrences(of: "sha256:", with: "").prefix(12))"
+        }
+        return name
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id = "Id"
-        case repoTags = "RepoTags"
-        case repoDigests = "RepoDigests"
-        case created = "Created"
-        case size = "Size"
-        case virtualSize = "VirtualSize"
-        case labels = "Labels"
-        case containers = "Containers"
+        case id
+        case name
+        case tags
+        case created
+        case size
+        case inUse = "in_use"
     }
+}
 
-    init(from decoder: Decoder) throws {
+extension DockerImage: Decodable {
+    nonisolated init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try container.decode(String.self, forKey: .id)
-        self.repoTags = try container.decodeIfPresent([String].self, forKey: .repoTags) ?? []
-        self.repoDigests = try container.decodeIfPresent([String].self, forKey: .repoDigests) ?? []
-        let createdSeconds = try container.decode(TimeInterval.self, forKey: .created)
+        self.name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
+        self.tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
+        let createdSeconds = try container.decodeIfPresent(TimeInterval.self, forKey: .created) ?? 0
         self.created = Date(timeIntervalSince1970: createdSeconds)
-        self.size = try container.decode(Int64.self, forKey: .size)
-        self.virtualSize = try container.decodeIfPresent(Int64.self, forKey: .virtualSize)
-        self.labels = try container.decodeIfPresent([String: String].self, forKey: .labels) ?? [:]
-        self.containers = try container.decodeIfPresent(Int.self, forKey: .containers) ?? 0
+        self.size = try container.decodeIfPresent(Int64.self, forKey: .size) ?? 0
+        self.inUse = try container.decodeIfPresent(Bool.self, forKey: .inUse) ?? false
     }
 }

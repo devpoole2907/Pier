@@ -1,41 +1,54 @@
 import SwiftUI
 import SwiftData
 
-/// Lists Docker images. Supports search, pull-to-refresh, and the pull/push add flow.
+/// Lists Docker images for the active Komodo server (or every reachable server, merged, in "All
+/// servers" mode). Supports search, pull-to-refresh, per-row and bulk delete, and pruning unused
+/// images. There is no image pull in Komodo, so unlike the old Portainer-backed view this has no
+/// add flow.
 struct ImagesListView: View {
     @Environment(HostManager.self) private var hostManager
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel: ImagesViewModel
     @State private var editMode: EditMode = .inactive
-    @State private var isShowingPullSheet = false
     @State private var selectedImageIDs: Set<String> = []
-    @State private var pendingDelete: DockerImage?
+    @State private var pendingDelete: ImageListItem?
     @State private var isShowingBulkDeleteAlert = false
+    @State private var isShowingPruneAlert = false
 
-    init(client: PortainerClient, endpointID: Int) {
-        _viewModel = State(initialValue: ImagesViewModel(client: client, endpointID: endpointID))
+    init(client: KomodoClient, serverID: String?, servers: [KomodoServer]) {
+        _viewModel = State(initialValue: ImagesViewModel(client: client, serverID: serverID, servers: servers))
     }
 
     var body: some View {
-        Group {
-            if viewModel.images.isEmpty, viewModel.isLoading {
-                LoadingView(message: "Loading images…")
-            } else if let error = viewModel.loadError, viewModel.images.isEmpty {
-                ErrorView(error: error, retry: {
-                    Task { await viewModel.load() }
-                })
-            } else if viewModel.images.isEmpty {
-                EmptyStateView(
-                    title: "No images",
-                    systemImage: "photo.stack",
-                    message: "Pull an image to get started."
+        VStack(spacing: 0) {
+            if !hostManager.servers.isEmpty {
+                TrawlSegmentBar(
+                    "Server scope",
+                    selection: serverScopeBinding,
+                    items: serverScopeItems
                 )
-            } else if viewModel.visibleImages.isEmpty {
-                ContentUnavailableView.search
-            } else {
-                List(selection: $selectedImageIDs) {
-                    ForEach(viewModel.visibleImages) { image in
-                        row(for: image)
+            }
+
+            Group {
+                if viewModel.items.isEmpty, viewModel.isLoading {
+                    LoadingView(message: "Loading images…")
+                } else if let error = viewModel.loadError, viewModel.items.isEmpty {
+                    ErrorView(error: error, retry: {
+                        Task { await viewModel.load() }
+                    })
+                } else if viewModel.items.isEmpty {
+                    EmptyStateView(
+                        title: "No images",
+                        systemImage: "photo.stack",
+                        message: "No Docker images were found."
+                    )
+                } else if viewModel.visibleItems.isEmpty {
+                    ContentUnavailableView.search
+                } else {
+                    List(selection: $selectedImageIDs) {
+                        ForEach(viewModel.visibleItems) { item in
+                            row(for: item)
+                        }
                     }
                 }
             }
@@ -51,29 +64,32 @@ struct ImagesListView: View {
             }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("This deletes \(selectedImages.count) image\(selectedImages.count == 1 ? "" : "s"). Remove forcefully if other images depend on them.")
+            Text("This deletes \(selectedItems.count) image\(selectedItems.count == 1 ? "" : "s").")
         }
-        .sheet(isPresented: $isShowingPullSheet) {
-            NavigationStack {
-                ImagePullView(viewModel: viewModel)
-            }
-        }
-        .alert(item: $pendingDelete) { image in
+        .alert(item: $pendingDelete) { item in
             Alert(
                 title: Text("Delete image?"),
-                message: Text("This deletes \(image.displayName). Remove forcefully if other images depend on it."),
+                message: Text("This deletes \(item.image.displayName)."),
                 primaryButton: .destructive(Text("Delete")) {
-                    Task { await viewModel.delete(image, force: true) }
+                    Task { await viewModel.delete(item) }
                 },
                 secondaryButton: .cancel()
             )
+        }
+        .alert("Prune unused images?", isPresented: $isShowingPruneAlert) {
+            Button("Prune", role: .destructive) {
+                Task { await viewModel.prune() }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text(pruneMessage)
         }
         .task { await viewModel.load() }
     }
 
     @ToolbarContentBuilder
     private var imagesToolbar: some ToolbarContent {
-        if !viewModel.visibleImages.isEmpty {
+        if !viewModel.visibleItems.isEmpty {
             ToolbarItem(placement: .platformTrailing) {
                 Button {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
@@ -97,20 +113,37 @@ struct ImagesListView: View {
 
         ToolbarItem(placement: .platformTrailing) {
             if isSelecting {
-                Button("Delete selected", systemImage: "trash") {
+                Button("Delete selected", systemImage: "trash", role: .destructive) {
                     isShowingBulkDeleteAlert = true
                 }
                 .disabled(selectedImageIDs.isEmpty)
             } else {
-                Button("Pull image", systemImage: "arrow.down.circle") {
-                    isShowingPullSheet = true
+                Menu("More", systemImage: "ellipsis.circle") {
+                    Button("Prune unused images", systemImage: "sparkles") {
+                        isShowingPruneAlert = true
+                    }
+                    .disabled(viewModel.isPruning)
                 }
             }
         }
     }
 
-    private var selectedImages: [DockerImage] {
-        viewModel.visibleImages.filter { selectedImageIDs.contains($0.id) }
+    private var serverScopeBinding: Binding<String?> {
+        Binding(
+            get: { hostManager.activeServerID },
+            set: { hostManager.setActiveServer($0) }
+        )
+    }
+
+    private var serverScopeItems: [TrawlSegmentBarItem<String?>] {
+        [TrawlSegmentBarItem("All", value: nil)]
+            + hostManager.servers.map { server in
+                TrawlSegmentBarItem(server.name, value: server.id)
+            }
+    }
+
+    private var selectedItems: [ImageListItem] {
+        viewModel.visibleItems.filter { selectedImageIDs.contains($0.id) }
     }
 
     private var selectionSubtitle: String? {
@@ -129,27 +162,37 @@ struct ImagesListView: View {
         selectionSubtitle ?? activeHostName ?? ""
     }
 
+    private var pruneMessage: String {
+        hostManager.activeServerID == nil
+            ? "This removes unused images from every reachable server."
+            : "This removes unused images from this server."
+    }
+
+    private func serverName(for serverID: String) -> String {
+        hostManager.servers.first(where: { $0.id == serverID })?.name ?? serverID
+    }
+
     @ViewBuilder
-    private func row(for image: DockerImage) -> some View {
+    private func row(for item: ImageListItem) -> some View {
+        let subtitleServerName = hostManager.activeServerID == nil ? serverName(for: item.serverID) : nil
         if isSelecting {
-            ImageRowView(image: image)
-            .tag(image.id)
+            ImageRowView(image: item.image, serverName: subtitleServerName)
+                .tag(item.id)
         } else {
-            ImageRowView(image: image)
-                .tag(image.id)
+            ImageRowView(image: item.image, serverName: subtitleServerName)
+                .tag(item.id)
                 .swipeActions(edge: .trailing) {
                     Button("Delete", systemImage: "trash", role: .destructive) {
-                        pendingDelete = image
+                        pendingDelete = item
                     }
                 }
         }
     }
 
     private func deleteSelectedImages() async {
-        let images = selectedImages
-        guard !images.isEmpty else { return }
-        let deletedIDs = await viewModel.delete(images, force: true)
+        let items = selectedItems
+        guard !items.isEmpty else { return }
+        let deletedIDs = await viewModel.delete(items)
         selectedImageIDs.subtract(deletedIDs)
     }
-
 }

@@ -1,96 +1,139 @@
 import Foundation
 import Observation
 
+/// A Docker image paired with the Komodo server it was fetched from. Komodo images are strictly
+/// per-server - there's no `ListAllDockerImages` the way there is `ListAllDockerContainers` - so
+/// "All servers" mode fans out to every reachable server and this pairing is what lets delete
+/// target the right server afterwards. When the same image exists on multiple servers it shows up
+/// as one `ImageListItem` per server, each independently deletable.
+struct ImageListItem: Identifiable, Hashable {
+    let image: DockerImage
+    let serverID: String
+
+    var id: String { "\(serverID)/\(image.id)" }
+}
+
 @MainActor
 @Observable
 final class ImagesViewModel {
-    private(set) var images: [DockerImage] = []
+    private(set) var items: [ImageListItem] = []
     private(set) var isLoading = false
-    private(set) var isPulling = false
-    private(set) var loadError: PortainerError?
-    private(set) var pullError: PortainerError?
+    private(set) var isPruning = false
+    private(set) var loadError: KomodoError?
 
     var searchText: String = ""
 
-    private let client: PortainerClient
-    private let endpointID: Int
+    private let client: KomodoClient
+    /// Scopes the list to a single Komodo server, or `nil` for "All servers".
+    private let serverID: String?
+    /// Needed only to fan out in "All servers" mode - unlike containers, Komodo has no aggregate
+    /// endpoint for images, so this view model has to enumerate servers itself.
+    private let servers: [KomodoServer]
 
-    init(client: PortainerClient, endpointID: Int) {
+    init(client: KomodoClient, serverID: String?, servers: [KomodoServer]) {
         self.client = client
-        self.endpointID = endpointID
+        self.serverID = serverID
+        self.servers = servers
     }
 
-    var visibleImages: [DockerImage] {
+    var visibleItems: [ImageListItem] {
         let trimmed = searchText.trimmingCharacters(in: .whitespaces)
         let base = trimmed.isEmpty
-            ? images
-            : images.filter { image in
-                image.repoTags.contains(where: { $0.localizedStandardContains(trimmed) })
-                    || image.id.localizedStandardContains(trimmed)
+            ? items
+            : items.filter { item in
+                item.image.displayName.localizedStandardContains(trimmed)
+                    || item.image.id.localizedStandardContains(trimmed)
+                    || item.image.tags.contains(where: { $0.localizedStandardContains(trimmed) })
             }
-        return base.sorted { $0.created > $1.created }
+        return base.sorted { $0.image.created > $1.image.created }
     }
 
     func load() async {
         isLoading = true
         defer { isLoading = false }
         do {
-            self.images = try await client.listImages(endpointID: endpointID)
+            if let serverID {
+                let images = try await client.listImages(serverID: serverID)
+                self.items = images.map { ImageListItem(image: $0, serverID: serverID) }
+            } else {
+                self.items = await loadAllServers()
+            }
             self.loadError = nil
         } catch {
-            self.loadError = PortainerError.from(error)
+            self.loadError = KomodoError.from(error)
         }
     }
 
-    func delete(_ image: DockerImage, force: Bool = false) async {
+    /// Fetches images from every reachable server concurrently and merges the results. A server
+    /// that fails this refresh is silently skipped (mirrors `ServersDashboardViewModel`'s
+    /// `loadStats`) rather than failing the whole load - one flaky server shouldn't blank the rest.
+    private func loadAllServers() async -> [ImageListItem] {
+        let reachable = servers.filter { $0.state == .ok }
+        guard !reachable.isEmpty else { return [] }
+        return await withTaskGroup(of: [ImageListItem].self) { group in
+            for server in reachable {
+                group.addTask { [client] in
+                    guard let images = try? await client.listImages(serverID: server.id) else { return [] }
+                    return images.map { ImageListItem(image: $0, serverID: server.id) }
+                }
+            }
+            var all: [ImageListItem] = []
+            for await result in group {
+                all.append(contentsOf: result)
+            }
+            return all
+        }
+    }
+
+    func delete(_ item: ImageListItem) async {
         do {
-            try await client.deleteImage(endpointID: endpointID, imageID: image.id, force: force)
+            try await client.deleteImage(serverID: item.serverID, name: item.image.name)
             await load()
         } catch {
-            self.loadError = PortainerError.from(error)
+            self.loadError = KomodoError.from(error)
         }
     }
 
-    func delete(_ images: [DockerImage], force: Bool = false) async -> [String] {
-        var deletedImageIDs: [String] = []
-        var firstError: PortainerError?
+    func delete(_ items: [ImageListItem]) async -> [String] {
+        var deletedIDs: [String] = []
+        var firstError: KomodoError?
 
-        for image in images {
+        for item in items {
             do {
-                try await client.deleteImage(endpointID: endpointID, imageID: image.id, force: force)
-                deletedImageIDs.append(image.id)
+                try await client.deleteImage(serverID: item.serverID, name: item.image.name)
+                deletedIDs.append(item.id)
             } catch {
                 if firstError == nil {
-                    firstError = PortainerError.from(error)
+                    firstError = KomodoError.from(error)
                 }
             }
         }
 
         await load()
 
-        if let error = firstError {
-            self.loadError = error
+        if let firstError {
+            self.loadError = firstError
         }
 
-        return deletedImageIDs
+        return deletedIDs
     }
 
-    /// Pulls a `name:tag` reference. If `tag` is omitted defaults to "latest".
-    func pull(reference: String) async {
-        let trimmed = reference.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return }
-        let parts = trimmed.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
-        let name = String(parts[0])
-        let tag = parts.count > 1 ? String(parts[1]) : "latest"
-
-        isPulling = true
-        defer { isPulling = false }
+    /// Prunes unused images on the active server, or on every reachable server in "All" mode.
+    func prune() async {
+        isPruning = true
+        defer { isPruning = false }
         do {
-            try await client.pullImage(endpointID: endpointID, fromImage: name, tag: tag)
-            self.pullError = nil
+            if let serverID {
+                try await client.pruneImages(serverID: serverID)
+            } else {
+                for server in servers where server.state == .ok {
+                    try await client.pruneImages(serverID: server.id)
+                }
+            }
+            self.loadError = nil
             await load()
         } catch {
-            self.pullError = PortainerError.from(error)
+            self.loadError = KomodoError.from(error)
         }
     }
 }

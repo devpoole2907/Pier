@@ -1,14 +1,15 @@
 import SwiftUI
 
-/// Logs view. Tails 200 lines, with "Load more" and a follow toggle.
+/// Logs view. Tails 200 lines, with "Load more" and a follow toggle. "Follow" is polling-based
+/// (Komodo has no log-stream endpoint) - see `LogsViewModel` for details.
 struct ContainerLogsView: View {
     @State private var viewModel: LogsViewModel
     @State private var copyFeedback = false
 
-    init(client: PortainerClient, endpointID: Int, containerID: String) {
+    init(client: KomodoClient, serverID: String, containerID: String) {
         _viewModel = State(initialValue: LogsViewModel(
             client: client,
-            endpointID: endpointID,
+            serverID: serverID,
             containerID: containerID
         ))
     }

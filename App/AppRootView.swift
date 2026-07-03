@@ -40,7 +40,7 @@ struct AppRootView: View {
             isInWelcomeFlow: $isInWelcomeFlow,
             setupTarget: $setupTarget,
             configuredServices: WelcomeServicesState(
-                portainer: !hosts.isEmpty,
+                komodo: !hosts.isEmpty,
                 nginxProxyManager: !npmHosts.isEmpty,
                 ssh: !sshProfiles.isEmpty
             )
@@ -110,9 +110,9 @@ struct AppRootView: View {
     @ViewBuilder
     private func setupSheet(for target: SetupTarget) -> some View {
         switch target {
-        case .portainer:
+        case .komodo:
             NavigationStack {
-                HostEditorView(host: activePortainerHost)
+                HostEditorView(host: activeKomodoHost)
             }
         case .nginxProxyManager:
             NavigationStack {
@@ -123,8 +123,8 @@ struct AppRootView: View {
         }
     }
 
-    /// On launch, if there is no active host yet, pick the first known host and load its endpoint.
-    /// If there are no Portainer hosts, leave the tab-level empty states in control.
+    /// On launch, if there is no active host yet, pick the first known host and load its servers.
+    /// If there are no Komodo hosts, leave the tab-level empty states in control.
     private func ensureActiveHost() async {
         guard !shouldShowWelcomeScreen else { return }
         if hosts.isEmpty {
@@ -136,8 +136,8 @@ struct AppRootView: View {
             await hostManager.setActive(first)
         } else if let activeID = hostManager.activeHostID,
                   let host = hosts.first(where: { $0.id == activeID }),
-                  hostManager.activeEndpointID == nil {
-            await hostManager.refreshActiveEndpoint(for: host)
+                  hostManager.servers.isEmpty {
+            await hostManager.refreshServers(for: host)
         }
     }
 
@@ -163,7 +163,7 @@ struct AppRootView: View {
         didEvaluateWelcomeState = true
     }
 
-    private var activePortainerHost: Host? {
+    private var activeKomodoHost: Host? {
         if let activeHostID = hostManager.activeHostID,
            let activeHost = hosts.first(where: { $0.id == activeHostID }) {
             return activeHost

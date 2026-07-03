@@ -8,25 +8,25 @@ struct StackRowView: View {
         HStack(spacing: DesignSystem.Spacing.medium) {
             Image(systemName: "square.stack.3d.up.fill")
                 .imageScale(.large)
-                .foregroundStyle(stack.isActive ? Color.green : .secondary)
+                .foregroundStyle(stack.state.color)
                 .frame(width: 32)
             VStack(alignment: .leading, spacing: DesignSystem.Spacing.tight) {
                 Text(stack.name)
                     .font(.body)
                     .fontWeight(.medium)
-                if let updated = stack.updateDate ?? stack.creationDate {
-                    Text("Updated \(updated.relativeShort)")
+                if !stack.statusText.isEmpty {
+                    Text(stack.statusText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
             Spacer()
-            Text(stack.isActive ? "Active" : "Inactive")
+            Text(stack.state.label)
                 .font(.caption)
-                .foregroundStyle(stack.isActive ? .green : .secondary)
+                .foregroundStyle(stack.state.color)
         }
         .padding(.vertical, DesignSystem.Spacing.tight)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(stack.name), \(stack.isActive ? "active" : "inactive") stack")
+        .accessibilityLabel("\(stack.name), \(stack.state.label) stack")
     }
 }

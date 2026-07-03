@@ -1,17 +1,19 @@
 import SwiftUI
 import SwiftData
 
-/// Resolves the active Portainer host/client pair and renders consistent empty, loading, and error
-/// states while the host endpoint is being established.
+/// Resolves the active Komodo host/client pair and renders consistent empty, loading, and error
+/// states while the connection is being established. Server-level scoping (Komodo's first-class
+/// Servers concept) is read separately by views from `hostManager.activeServerID` /
+/// `hostManager.servers` - there is no per-endpoint integer to thread through here anymore.
 struct ActiveHostGate<Content: View>: View {
     @Environment(HostManager.self) private var hostManager
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Host.createdAt) private var hosts: [Host]
 
-    @ViewBuilder private let content: (Host, PortainerClient, Int) -> Content
-    private typealias ActiveClient = (host: Host, client: PortainerClient, endpointID: Int)
+    @ViewBuilder private let content: (Host, KomodoClient) -> Content
+    private typealias ActiveClient = (host: Host, client: KomodoClient)
 
-    init(@ViewBuilder content: @escaping (Host, PortainerClient, Int) -> Content) {
+    init(@ViewBuilder content: @escaping (Host, KomodoClient) -> Content) {
         self.content = content
     }
 
@@ -19,7 +21,7 @@ struct ActiveHostGate<Content: View>: View {
     var body: some View {
         switch activeClientResult {
         case .success(let active):
-            content(active.host, active.client, active.endpointID)
+            content(active.host, active.client)
         case .failure(let error):
             ErrorView(
                 error: error,
@@ -53,7 +55,7 @@ struct ActiveHostGate<Content: View>: View {
     private func retryConnection() {
         guard let host = activeHost else { return }
         Task {
-            await hostManager.refreshActiveEndpoint(for: host)
+            await hostManager.refreshServers(for: host)
         }
     }
 
@@ -77,12 +79,12 @@ struct ActiveHostGate<Content: View>: View {
         return hosts.first(where: { $0.id == activeHostID })
     }
 
-    private var activeClientResult: Result<ActiveClient, PortainerError>? {
+    private var activeClientResult: Result<ActiveClient, KomodoError>? {
         do {
             guard let active = try hostManager.resolveActiveClient(in: modelContext) else { return nil }
             return .success(active)
         } catch {
-            return .failure(PortainerError.from(error))
+            return .failure(KomodoError.from(error))
         }
     }
 }

@@ -7,11 +7,11 @@ struct StacksListView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel: StacksViewModel
     @State private var editMode: EditMode = .inactive
-    @State private var selectedStackIDs: Set<Int> = []
+    @State private var selectedStackIDs: Set<String> = []
     @State private var pendingBulkAction: BulkStackAction?
 
-    init(client: PortainerClient, endpointID: Int) {
-        _viewModel = State(initialValue: StacksViewModel(client: client, endpointID: endpointID))
+    init(client: KomodoClient) {
+        _viewModel = State(initialValue: StacksViewModel(client: client))
     }
 
     var body: some View {
@@ -161,7 +161,7 @@ struct StacksListView: View {
         case .stop:
             await viewModel.stop(targets)
         case .delete:
-            await viewModel.delete(targets)
+            await viewModel.destroy(targets)
         }
         if viewModel.loadError == nil {
             selectedStackIDs.subtract(targets.map(\.id))

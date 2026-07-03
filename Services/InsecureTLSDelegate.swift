@@ -1,7 +1,7 @@
 import Foundation
 
 /// URLSessionDelegate that accepts any server certificate. Used only when a host opts in via
-/// `Host.allowsInsecureTLS`. Common for self-signed local Portainer setups.
+/// `Host.allowsInsecureTLS`. Common for self-signed local Komodo/NPM setups.
 ///
 /// Marked `final` and `Sendable`; it has no mutable state.
 final class InsecureTLSDelegate: NSObject, URLSessionDelegate, Sendable {

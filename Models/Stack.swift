@@ -1,67 +1,121 @@
-import Foundation
+import SwiftUI
 
-/// A Portainer-managed compose stack as returned by `GET /stacks`.
-struct Stack: Identifiable, Sendable, Hashable {
-    let id: Int
+/// A Komodo-managed compose stack as returned by `/read/ListStacks`. Stacks are Core-level
+/// resources explicitly attached to a Server (rather than living implicitly on a single hidden
+/// environment).
+nonisolated struct Stack: Identifiable, Sendable, Hashable {
+    let id: String
     let name: String
-    let type: Int
-    let endpointID: Int
-    let status: Int
-    let creationDate: Date?
-    let updateDate: Date?
-    let projectPath: String?
+    let serverID: String
+    let state: StackState
+    let statusText: String
+    let services: [StackServiceInfo]
+    let filesOnHost: Bool
+    let tags: [String]
 
-    /// Stack status: 1 = active, 2 = inactive (per Portainer convention).
-    var isActive: Bool { status == 1 }
-
-    private enum CodingKeys: String, CodingKey {
-        case id = "Id"
-        case name = "Name"
-        case type = "Type"
-        case endpointID = "EndpointId"
-        case status = "Status"
-        case creationDate = "CreationDate"
-        case updateDate = "UpdateDate"
-        case projectPath = "ProjectPath"
+    /// True if any service in the stack has an update available.
+    var updateAvailable: Bool {
+        services.contains(where: \.updateAvailable)
     }
 
+    /// A stack is "active" when its containers are up (running, or running-but-degraded).
+    var isActive: Bool {
+        state == .running || state == .unhealthy
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case tags
+        case info
+    }
+
+    private enum InfoKeys: String, CodingKey {
+        case serverID = "server_id"
+        case filesOnHost = "files_on_host"
+        case state
+        case status
+        case services
+    }
 }
 
 extension Stack: Decodable {
     nonisolated init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.id = try container.decode(Int.self, forKey: .id)
-        self.name = try container.decode(String.self, forKey: .name)
-        self.type = try container.decodeIfPresent(Int.self, forKey: .type) ?? 0
-        self.endpointID = try container.decodeIfPresent(Int.self, forKey: .endpointID) ?? 0
-        self.status = try container.decodeIfPresent(Int.self, forKey: .status) ?? 0
-        self.projectPath = try container.decodeIfPresent(String.self, forKey: .projectPath)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
+        self.tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
 
-        if let creation = try container.decodeIfPresent(TimeInterval.self, forKey: .creationDate), creation > 0 {
-            self.creationDate = Date(timeIntervalSince1970: creation)
-        } else {
-            self.creationDate = nil
-        }
-        if let update = try container.decodeIfPresent(TimeInterval.self, forKey: .updateDate), update > 0 {
-            self.updateDate = Date(timeIntervalSince1970: update)
-        } else {
-            self.updateDate = nil
-        }
+        let info = try container.nestedContainer(keyedBy: InfoKeys.self, forKey: .info)
+        self.serverID = try info.decodeIfPresent(String.self, forKey: .serverID) ?? ""
+        self.filesOnHost = try info.decodeIfPresent(Bool.self, forKey: .filesOnHost) ?? false
+        let rawState = try info.decodeIfPresent(String.self, forKey: .state)
+        self.state = StackState(rawState: rawState)
+        self.statusText = try info.decodeIfPresent(String.self, forKey: .status) ?? ""
+        self.services = try info.decodeIfPresent([StackServiceInfo].self, forKey: .services) ?? []
     }
 }
 
-/// Stack file content - returned from `GET /stacks/{id}/file` as `{ "StackFileContent": "..." }`.
-struct StackFile: Sendable {
-    let stackFileContent: String
+/// Per-service summary embedded in a `Stack` list item (`info.services`).
+nonisolated struct StackServiceInfo: Sendable, Hashable, Identifiable {
+    let service: String
+    let image: String
+    let updateAvailable: Bool
+
+    var id: String { service }
 
     private enum CodingKeys: String, CodingKey {
-        case stackFileContent = "StackFileContent"
+        case service
+        case image
+        case updateAvailable = "update_available"
     }
 }
 
-extension StackFile: Decodable {
+extension StackServiceInfo: Decodable {
     nonisolated init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.stackFileContent = try container.decode(String.self, forKey: .stackFileContent)
+        self.service = try container.decodeIfPresent(String.self, forKey: .service) ?? ""
+        self.image = try container.decodeIfPresent(String.self, forKey: .image) ?? ""
+        self.updateAvailable = try container.decodeIfPresent(Bool.self, forKey: .updateAvailable) ?? false
+    }
+}
+
+/// Normalized stack health state, from `info.state`.
+nonisolated enum StackState: String, Sendable, CaseIterable {
+    case running
+    case stopped
+    case unhealthy
+    case deploying
+    case down
+    case unknown
+
+    init(rawState: String?) {
+        guard let rawState else {
+            self = .unknown
+            return
+        }
+        self = StackState(rawValue: rawState.lowercased()) ?? .unknown
+    }
+
+    var label: String {
+        switch self {
+        case .running: "Running"
+        case .stopped: "Stopped"
+        case .unhealthy: "Unhealthy"
+        case .deploying: "Deploying"
+        case .down: "Down"
+        case .unknown: "Unknown"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .running: .green
+        case .stopped: .secondary
+        case .unhealthy: .red
+        case .deploying: .orange
+        case .down: .gray
+        case .unknown: .gray
+        }
     }
 }

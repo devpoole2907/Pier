@@ -5,6 +5,7 @@ struct ContainerDetailView: View {
     @State private var viewModel: ContainerDetailViewModel
     @State private var pendingDestructiveAction: DestructiveAction?
     @State private var isShowingLogs = false
+    @AppStorage("refreshIntervalSeconds") private var refreshIntervalRaw: Int = RefreshInterval.medium.rawValue
 
     private var isShowingActionError: Binding<Bool> {
         Binding(
@@ -13,10 +14,10 @@ struct ContainerDetailView: View {
         )
     }
 
-    init(client: PortainerClient, endpointID: Int, containerID: String, initialName: String) {
+    init(client: KomodoClient, serverID: String, containerID: String, initialName: String) {
         _viewModel = State(initialValue: ContainerDetailViewModel(
             client: client,
-            endpointID: endpointID,
+            serverID: serverID,
             containerID: containerID,
             initialName: initialName
         ))
@@ -31,8 +32,8 @@ struct ContainerDetailView: View {
             .toolbar { actionsMenu }
             .navigationDestination(isPresented: $isShowingLogs) {
                 ContainerLogsView(
-                    client: viewModel.portainerClient,
-                    endpointID: viewModel.resolvedEndpointID,
+                    client: viewModel.komodoClient,
+                    serverID: viewModel.serverID,
                     containerID: viewModel.containerID
                 )
             }
@@ -45,7 +46,13 @@ struct ContainerDetailView: View {
             }
         return withAlerts
             .task { await viewModel.load() }
-            .refreshable { await viewModel.load() }
+            .refreshable {
+                await viewModel.load()
+                await viewModel.refreshStats()
+            }
+            .task(id: refreshIntervalRaw) {
+                await viewModel.runStatsPolling(every: RefreshInterval(rawValue: refreshIntervalRaw)?.seconds)
+            }
     }
 
     @ToolbarContentBuilder

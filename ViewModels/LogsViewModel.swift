@@ -1,25 +1,30 @@
 import Foundation
 import Observation
 
+/// Komodo's `GetContainerLog` has no follow/stream endpoint - it always returns a snapshot of the
+/// last `tail` lines. "Follow" is implemented here as a poll loop (`startFollowing`) that
+/// re-fetches the snapshot on an interval and replaces the buffer wholesale, rather than
+/// streaming and appending incremental chunks the way the previous Docker-management backend did.
 @MainActor
 @Observable
 final class LogsViewModel {
     private(set) var lines: [LogLine] = []
     private(set) var isFollowing = false
-    private(set) var loadError: PortainerError?
+    private(set) var loadError: KomodoError?
 
     var searchText: String = ""
     var tailCount: Int = 200
 
-    private let client: PortainerClient
-    private let endpointID: Int
+    private let client: KomodoClient
+    private let serverID: String
     private let containerID: String
     @ObservationIgnored private var followTask: Task<Void, Never>?
-    private var nextLineNumber = 0
+    /// How often the follow loop re-polls the log snapshot.
+    private let followInterval: Duration = .seconds(3)
 
-    init(client: PortainerClient, endpointID: Int, containerID: String) {
+    init(client: KomodoClient, serverID: String, containerID: String) {
         self.client = client
-        self.endpointID = endpointID
+        self.serverID = serverID
         self.containerID = containerID
     }
 
@@ -37,14 +42,11 @@ final class LogsViewModel {
     /// Loads a single tail snapshot.
     func loadInitial() async {
         do {
-            let raw = try await client.fetchLogs(endpointID: endpointID, containerID: containerID, tail: tailCount)
-            self.lines = raw
-                .split(separator: "\n", omittingEmptySubsequences: false)
-                .map { String($0) }
-                .map { LogLine(number: nextNumber(), text: $0) }
+            let log = try await client.containerLog(serverID: serverID, containerID: containerID, tail: tailCount)
+            self.lines = Self.parseLines(from: log.combined)
             self.loadError = nil
         } catch {
-            self.loadError = PortainerError.from(error)
+            self.loadError = KomodoError.from(error)
         }
     }
 
@@ -54,18 +56,15 @@ final class LogsViewModel {
         await loadInitial()
     }
 
+    /// Starts the poll loop. Idempotent if already following.
     func startFollowing() async {
         guard followTask == nil else { return }
         isFollowing = true
-        let stream = await client.streamLogs(endpointID: endpointID, containerID: containerID, tail: 0)
         followTask = Task { [weak self] in
-            do {
-                for try await chunk in stream {
-                    guard let self else { return }
-                    self.appendChunk(chunk)
-                }
-            } catch {
-                self?.loadError = PortainerError.from(error)
+            while let self, !Task.isCancelled {
+                await self.pollOnce()
+                guard !Task.isCancelled else { return }
+                try? await Task.sleep(for: self.followInterval)
             }
             self?.isFollowing = false
         }
@@ -77,23 +76,24 @@ final class LogsViewModel {
         isFollowing = false
     }
 
-    private func appendChunk(_ chunk: String) {
-        let split = chunk
-            .split(separator: "\n", omittingEmptySubsequences: false)
-            .map { String($0) }
-            .filter { !$0.isEmpty }
-        for text in split {
-            lines.append(LogLine(number: nextNumber(), text: text))
-        }
-        // Trim to keep memory bounded; views can scroll back through the in-memory buffer up to this limit.
-        if lines.count > DesignSystem.Limits.maxLogLines {
-            lines.removeFirst(lines.count - DesignSystem.Limits.maxLogLines)
+    private func pollOnce() async {
+        do {
+            let log = try await client.containerLog(serverID: serverID, containerID: containerID, tail: tailCount)
+            self.lines = Self.parseLines(from: log.combined)
+            self.loadError = nil
+        } catch {
+            self.loadError = KomodoError.from(error)
         }
     }
 
-    private func nextNumber() -> Int {
-        defer { nextLineNumber += 1 }
-        return nextLineNumber
+    /// Splits a combined log snapshot into numbered lines. Since every fetch replaces the buffer
+    /// wholesale (rather than appending), numbering restarts from zero each time - stable line
+    /// identity across polls isn't needed the way it was for the old incremental stream.
+    private static func parseLines(from text: String) -> [LogLine] {
+        text
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .enumerated()
+            .map { LogLine(number: $0.offset, text: String($0.element)) }
     }
 
     deinit {

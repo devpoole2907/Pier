@@ -4,7 +4,10 @@ import SwiftUI
 /// and animation timings up front means the look stays consistent and is trivially adjustable.
 enum DesignSystem {
     enum Colors {
-        /// Portainer's current default "purple" active brand color from portainer.io.
+        /// Brand accent for the Docker-management integration (Komodo). Kept as this purple
+        /// since it's already woven through the app's accent color and screenshots; swap to a
+        /// Komodo blue (e.g. `Color(red: 0.29, green: 0.56, blue: 0.89)`) if/when we want the UI
+        /// to visually announce the backend change.
         static let accent = Color(red: 192 / 255, green: 128 / 255, blue: 1)
         /// Nginx Proxy Manager brand orange.
         static let npm = Color(red: 241 / 255, green: 90 / 255, blue: 36 / 255)

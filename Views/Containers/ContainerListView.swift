@@ -12,8 +12,8 @@ struct ContainerListView: View {
     @AppStorage("refreshIntervalSeconds") private var refreshIntervalRaw: Int = RefreshInterval.medium.rawValue
     @AppStorage("showStoppedContainers") private var showStoppedContainers: Bool = true
 
-    init(client: PortainerClient, endpointID: Int) {
-        _viewModel = State(initialValue: ContainerListViewModel(client: client, endpointID: endpointID))
+    init(client: KomodoClient, serverID: String?) {
+        _viewModel = State(initialValue: ContainerListViewModel(client: client, serverID: serverID))
     }
 
     var body: some View {
@@ -54,8 +54,8 @@ struct ContainerListView: View {
 
     @ViewBuilder
     private var contentList: some View {
-        if viewModel.filter == .byStack {
-            ContainerListByStackView(
+        if viewModel.filter == .byServer {
+            ContainerListByServerView(
                 viewModel: viewModel,
                 selection: $selectedContainerIDs,
                 isSelecting: isSelecting

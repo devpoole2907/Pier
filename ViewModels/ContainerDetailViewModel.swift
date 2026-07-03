@@ -4,21 +4,29 @@ import Observation
 @MainActor
 @Observable
 final class ContainerDetailViewModel {
+    let serverID: String
     let containerID: String
     let initialName: String
     private(set) var detail: ContainerDetail?
-    private(set) var loadError: PortainerError?
+    private(set) var loadError: KomodoError?
     /// Settable so the alert dismiss action can clear it.
-    var actionError: PortainerError?
+    var actionError: KomodoError?
     private(set) var isLoading = false
     private(set) var isPerformingAction = false
 
-    private let client: PortainerClient
-    private let endpointID: Int
+    /// Inline live-stats snapshot (CPU%/mem/net/block IO/pids). Komodo has no per-container stats
+    /// stream - this is refreshed by re-listing containers on `serverID` and picking out this
+    /// container, driven by `runStatsPolling(every:)` from the detail view's polling loop.
+    private(set) var liveStats: ContainerLiveStats?
+    /// Small ring buffer of polled `cpuPercent` samples powering the detail sparkline, bounded by
+    /// `DesignSystem.Limits.maxStatsSamples`.
+    private(set) var cpuHistory: [Double] = []
 
-    init(client: PortainerClient, endpointID: Int, containerID: String, initialName: String) {
+    private let client: KomodoClient
+
+    init(client: KomodoClient, serverID: String, containerID: String, initialName: String) {
         self.client = client
-        self.endpointID = endpointID
+        self.serverID = serverID
         self.containerID = containerID
         self.initialName = initialName
     }
@@ -37,26 +45,56 @@ final class ContainerDetailViewModel {
         isLoading = true
         defer { isLoading = false }
         do {
-            self.detail = try await client.inspectContainer(endpointID: endpointID, containerID: containerID)
+            self.detail = try await client.inspectContainer(serverID: serverID, containerID: containerID)
             self.loadError = nil
         } catch {
-            self.loadError = PortainerError.from(error)
+            self.loadError = KomodoError.from(error)
         }
     }
 
-    func start() async { await performAction { try await self.client.startContainer(endpointID: self.endpointID, containerID: self.containerID) } }
-    func stop() async { await performAction { try await self.client.stopContainer(endpointID: self.endpointID, containerID: self.containerID) } }
-    func restart() async { await performAction { try await self.client.restartContainer(endpointID: self.endpointID, containerID: self.containerID) } }
-    func kill() async { await performAction { try await self.client.killContainer(endpointID: self.endpointID, containerID: self.containerID) } }
-    func delete(removeVolumes: Bool = false) async {
-        await performAction {
-            try await self.client.deleteContainer(
-                endpointID: self.endpointID,
-                containerID: self.containerID,
-                force: true,
-                removeVolumes: removeVolumes
-            )
+    /// Refreshes the inline live-stats snapshot by re-listing containers on this container's
+    /// server and matching by ID. Stats are supplementary to the main inspect load, so failures
+    /// here are silently ignored rather than surfaced as a blocking error.
+    func refreshStats() async {
+        do {
+            let containers = try await client.listContainers(serverID: serverID)
+            guard let match = containers.first(where: { $0.id == containerID }) else { return }
+            self.liveStats = match.stats
+            if let cpuPercent = match.stats?.cpuPercent {
+                cpuHistory.append(cpuPercent)
+                if cpuHistory.count > DesignSystem.Limits.maxStatsSamples {
+                    cpuHistory.removeFirst(cpuHistory.count - DesignSystem.Limits.maxStatsSamples)
+                }
+            }
+        } catch {
+            // Stats are supplementary; the main detail load surfaces connectivity problems.
         }
+    }
+
+    /// Long-running polling loop for the inline stats section. Always refreshes once immediately,
+    /// then loops on `seconds` if provided (`nil` means the user has turned off auto-refresh).
+    /// Drive this from the view's `.task(id:)` so cancellation flows naturally on view
+    /// disappearance or interval change.
+    func runStatsPolling(every seconds: TimeInterval?) async {
+        await refreshStats()
+        guard let seconds else { return }
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(seconds))
+            guard !Task.isCancelled else { return }
+            await refreshStats()
+        }
+    }
+
+    func start() async { await performAction { try await self.client.startContainer(serverID: self.serverID, containerID: self.containerID) } }
+    func stop() async { await performAction { try await self.client.stopContainer(serverID: self.serverID, containerID: self.containerID) } }
+    func restart() async { await performAction { try await self.client.restartContainer(serverID: self.serverID, containerID: self.containerID) } }
+    func kill() async {
+        // Komodo has no dedicated "kill" call; a SIGKILL stop with no grace period is the
+        // equivalent of the old "kill" action.
+        await performAction { try await self.client.stopContainer(serverID: self.serverID, containerID: self.containerID, signal: "SIGKILL", time: 0) }
+    }
+    func delete() async {
+        await performAction { try await self.client.destroyContainer(serverID: self.serverID, containerID: self.containerID) }
     }
 
     private func performAction(_ body: @escaping @Sendable () async throws -> Void) async {
@@ -67,11 +105,10 @@ final class ContainerDetailViewModel {
             self.actionError = nil
             await load()
         } catch {
-            self.actionError = PortainerError.from(error)
+            self.actionError = KomodoError.from(error)
         }
     }
 
-    /// Make `client` and `endpointID` accessible to the stats/logs subviews. Both are immutable on the actor side.
-    var portainerClient: PortainerClient { client }
-    var resolvedEndpointID: Int { endpointID }
+    /// Exposes `client` to the logs subview. Immutable on the actor side.
+    var komodoClient: KomodoClient { client }
 }

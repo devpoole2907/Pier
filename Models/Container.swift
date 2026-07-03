@@ -1,57 +1,74 @@
 import Foundation
 
-/// Container summary as returned by `GET /containers/json`. This is the lightweight form
-/// suitable for list rows; full details come from `ContainerDetail`.
-struct Container: Identifiable, Sendable, Decodable, Hashable {
+/// Container summary as returned by `/read/ListDockerContainers` (or `ListAllDockerContainers`).
+/// This is the lightweight form suitable for list rows; full details come from `ContainerDetail`.
+/// Komodo inlines a live stats snapshot directly on the list item rather than requiring a
+/// separate streaming stats call.
+nonisolated struct Container: Identifiable, Sendable, Hashable {
     let id: String
-    let names: [String]
+    let serverID: String
+    let name: String
     let image: String
     let imageID: String
-    let command: String
     let created: Date
     let state: ContainerStatus
     let status: String
+    let networkMode: String?
+    let networks: [String]
     let ports: [PortBinding]
-    let labels: [String: String]
+    let stats: ContainerLiveStats?
 
-    /// Display name, with the leading slash Docker prepends stripped.
-    var displayName: String {
-        let raw = names.first ?? id.prefix(12).description
-        return raw.hasPrefix("/") ? String(raw.dropFirst()) : raw
+    /// Komodo already strips the leading slash Docker prepends, so this is just `name`.
+    var displayName: String { name }
+
+    /// Compose stack name. Not present on the list item itself (Komodo joins stacks
+    /// separately via `ListStacks`/`ListStackServices`); grouping in the UI is done by
+    /// server instead. Kept for source compatibility with call sites that still reference it.
+    var stackName: String? { nil }
+
+    static func == (lhs: Container, rhs: Container) -> Bool {
+        lhs.id == rhs.id
     }
 
-    /// Compose stack name, if this container belongs to one.
-    var stackName: String? {
-        labels["com.docker.compose.project"]
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id = "Id"
-        case names = "Names"
-        case image = "Image"
-        case imageID = "ImageID"
-        case command = "Command"
-        case created = "Created"
-        case state = "State"
-        case status = "Status"
-        case ports = "Ports"
-        case labels = "Labels"
+        case id
+        case serverID = "server_id"
+        case name
+        case image
+        case imageID = "image_id"
+        case created
+        case state
+        case status
+        case networkMode = "network_mode"
+        case networks
+        case ports
+        case stats
     }
+}
 
-    init(from decoder: Decoder) throws {
+extension Container: Decodable {
+    nonisolated init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try container.decode(String.self, forKey: .id)
-        self.names = try container.decode([String].self, forKey: .names)
-        self.image = try container.decode(String.self, forKey: .image)
-        self.imageID = try container.decode(String.self, forKey: .imageID)
-        self.command = try container.decode(String.self, forKey: .command)
-        // Docker returns `Created` as a Unix timestamp (seconds).
-        let createdSeconds = try container.decode(TimeInterval.self, forKey: .created)
+        self.serverID = try container.decodeIfPresent(String.self, forKey: .serverID) ?? ""
+        self.name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
+        self.image = try container.decodeIfPresent(String.self, forKey: .image) ?? ""
+        self.imageID = try container.decodeIfPresent(String.self, forKey: .imageID) ?? ""
+
+        // Komodo returns `created` as a Unix timestamp in seconds.
+        let createdSeconds = try container.decodeIfPresent(TimeInterval.self, forKey: .created) ?? 0
         self.created = Date(timeIntervalSince1970: createdSeconds)
-        let rawState = try container.decode(String.self, forKey: .state)
+
+        let rawState = try container.decodeIfPresent(String.self, forKey: .state) ?? ""
         self.state = ContainerStatus(rawState: rawState)
-        self.status = try container.decode(String.self, forKey: .status)
+        self.status = try container.decodeIfPresent(String.self, forKey: .status) ?? ""
+        self.networkMode = try container.decodeIfPresent(String.self, forKey: .networkMode)
+        self.networks = try container.decodeIfPresent([String].self, forKey: .networks) ?? []
         self.ports = try container.decodeIfPresent([PortBinding].self, forKey: .ports) ?? []
-        self.labels = try container.decodeIfPresent([String: String].self, forKey: .labels) ?? [:]
+        self.stats = try container.decodeIfPresent(ContainerLiveStats.self, forKey: .stats)
     }
 }

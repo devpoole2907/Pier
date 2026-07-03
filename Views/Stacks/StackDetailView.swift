@@ -8,33 +8,31 @@ struct StackDetailView: View {
     @State private var pendingDelete = false
     @State private var pendingStop = false
 
-    private let containersClient: PortainerClient
-    private let containersEndpointID: Int
     @State private var containerListVM: ContainerListViewModel
 
-    init(stack: Stack, client: PortainerClient, endpointID: Int) {
+    init(stack: Stack, client: KomodoClient) {
         self.stack = stack
-        self.containersClient = client
-        self.containersEndpointID = endpointID
-        _viewModel = State(initialValue: StacksViewModel(client: client, endpointID: endpointID))
-        _containerListVM = State(initialValue: ContainerListViewModel(client: client, endpointID: endpointID))
+        _viewModel = State(initialValue: StacksViewModel(client: client))
+        _containerListVM = State(initialValue: ContainerListViewModel(client: client, serverID: stack.serverID))
     }
 
     var body: some View {
         List {
             Section("Stack") {
                 LabeledContent("Status") {
-                    Text(stack.isActive ? "Active" : "Inactive")
-                        .foregroundStyle(stack.isActive ? .green : .secondary)
+                    Text(stack.state.label)
+                        .foregroundStyle(stack.state.color)
                 }
-                if let created = stack.creationDate {
-                    LabeledContent("Created") {
-                        Text(created, format: .dateTime.day().month().year())
+                if !stack.statusText.isEmpty {
+                    LabeledContent("Detail") {
+                        Text(stack.statusText)
+                            .foregroundStyle(.secondary)
                     }
                 }
-                if let updated = stack.updateDate {
-                    LabeledContent("Updated") {
-                        Text(updated, format: .dateTime.day().month().year())
+                if stack.updateAvailable {
+                    LabeledContent("Update") {
+                        Text("Available")
+                            .foregroundStyle(.orange)
                     }
                 }
             }
@@ -60,13 +58,13 @@ struct StackDetailView: View {
         }
         .sheet(isPresented: $isShowingEditor) {
             NavigationStack {
-                StackEditorView(initialContent: viewModel.fileContent, stackName: stack.name)
+                StackEditorView(initialContent: viewModel.file?.contents ?? "", stackName: stack.name)
             }
         }
         .alert("Delete stack?", isPresented: $pendingDelete) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
-                Task { await viewModel.delete(stack) }
+                Task { await viewModel.destroy([stack]) }
             }
         } message: {
             Text("This removes the stack and its containers. This action cannot be undone.")

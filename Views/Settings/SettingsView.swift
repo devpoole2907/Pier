@@ -22,7 +22,7 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     } label: {
-                        Label("Manage Portainer hosts", systemImage: "externaldrive")
+                        Label("Manage Komodo hosts", systemImage: "externaldrive")
                     }
                 }
             }
@@ -70,8 +70,8 @@ struct SettingsView: View {
                     Text(versionString)
                         .foregroundStyle(.secondary)
                 }
-                Link(destination: URL(string: "https://docs.portainer.io/api")!) {
-                    Label("Portainer API docs", systemImage: "book")
+                Link(destination: URL(string: "https://komo.do/docs/api")!) {
+                    Label("Komodo API docs", systemImage: "book")
                 }
             }
         }
