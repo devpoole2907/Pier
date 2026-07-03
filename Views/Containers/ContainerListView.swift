@@ -17,35 +17,36 @@ struct ContainerListView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            if hostManager.servers.count > 1 {
+        Group {
+            if viewModel.containers.isEmpty, viewModel.isLoading {
+                LoadingView(message: "Loading containers…")
+            } else if let error = viewModel.loadError, viewModel.containers.isEmpty {
+                ErrorView(error: error, retry: {
+                    Task { await viewModel.load(includeStopped: showStoppedContainers) }
+                })
+            } else if viewModel.containers.isEmpty {
+                EmptyStateView(
+                    title: "No containers",
+                    systemImage: "shippingbox",
+                    message: "This host has no Docker containers yet."
+                )
+            } else if viewModel.visibleContainers.isEmpty {
+                ContentUnavailableView.search
+            } else {
+                contentList
+            }
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if hostManager.servers.count > 1, !isSelecting {
                 TrawlSegmentBar(
                     "Server scope",
                     selection: serverScopeBinding,
                     items: serverScopeItems
                 )
-            }
-
-            Group {
-                if viewModel.containers.isEmpty, viewModel.isLoading {
-                    LoadingView(message: "Loading containers…")
-                } else if let error = viewModel.loadError, viewModel.containers.isEmpty {
-                    ErrorView(error: error, retry: {
-                        Task { await viewModel.load(includeStopped: showStoppedContainers) }
-                    })
-                } else if viewModel.containers.isEmpty {
-                    EmptyStateView(
-                        title: "No containers",
-                        systemImage: "shippingbox",
-                        message: "This host has no Docker containers yet."
-                    )
-                } else if viewModel.visibleContainers.isEmpty {
-                    ContentUnavailableView.search
-                } else {
-                    contentList
-                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: hostManager.activeServerID)
         .environment(\.editMode, $editMode)
         .searchable(text: $viewModel.searchText, prompt: "Search containers")
         .refreshable { await viewModel.refresh(includeStopped: showStoppedContainers) }
@@ -143,7 +144,11 @@ struct ContainerListView: View {
     private var serverScopeBinding: Binding<String?> {
         Binding(
             get: { hostManager.activeServerID },
-            set: { hostManager.setActiveServer($0) }
+            set: { newValue in
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                    hostManager.setActiveServer(newValue)
+                }
+            }
         )
     }
 
@@ -155,7 +160,8 @@ struct ContainerListView: View {
     }
 
     private var selectionSubtitle: String? {
-        selectedContainerIDs.isEmpty ? nil : "\(selectedContainerIDs.count) selected"
+        guard isSelecting, !selectedContainerIDs.isEmpty else { return nil }
+        return "\(selectedContainerIDs.count) selected"
     }
 
     private var isSelecting: Bool {

@@ -61,11 +61,13 @@ struct ServerRowView: View {
                 Text(server.name)
                     .font(.headline)
                 Spacer()
-                Label(server.state.label, systemImage: "circle.fill")
-                    .labelStyle(.titleAndIcon)
-                    .font(.caption)
-                    .imageScale(.small)
-                    .foregroundStyle(server.state.color)
+                HStack(spacing: 4) {
+                    Image(systemName: "circle.fill")
+                        .imageScale(.small)
+                    Text(server.state.label)
+                }
+                .font(.caption)
+                .foregroundStyle(server.state.color)
             }
 
             if let stats {

@@ -11,7 +11,9 @@ struct ContainerListByServerView: View {
     let isSelecting: Bool
 
     var body: some View {
-        List(selection: $selection) {
+        // See ContainerListFlatView: bind selection only while selecting to avoid taps leaking
+        // into the selection set outside edit mode.
+        List(selection: isSelecting ? $selection : .constant([])) {
             ForEach(viewModel.containersByServer, id: \.0) { serverID, containers in
                 Section(serverName(for: serverID)) {
                     ForEach(containers) { container in

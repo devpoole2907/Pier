@@ -1,17 +1,16 @@
 import SwiftUI
 
 /// Lets the user pick a specific Komodo resource (of the given `kind`) from the live lists
-/// fetched for the active host, then opens a terminal for it.
+/// fetched for the active host, then adds it as a saved terminal target on the Terminals tab.
 ///
-/// Design choice: rather than tapping a row to navigate straight to the terminal (which is how
-/// the main Terminals list works), this sheet uses an explicit select-then-confirm flow — tap a
-/// row to highlight it, then tap "Open Terminal" — since it's reached from the "+" menu where the
-/// user hasn't yet committed to a specific target.
+/// Reached from the "+" menu: the user picks a resource here, taps "Add", and it's pinned to the
+/// Terminals list (tapping it there opens the live terminal). Select-then-confirm rather than
+/// tap-to-commit since the picker shows the full live inventory.
 struct KomodoTerminalConfigSheet: View {
     let kind: KomodoTerminalTarget.Kind
     let servers: [KomodoServer]
     let resources: TerminalsKomodoResources
-    let onOpen: (KomodoTerminalTarget) -> Void
+    let onAdd: (KomodoTerminalTarget) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var selectedID: String?
@@ -60,9 +59,9 @@ struct KomodoTerminalConfigSheet: View {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Open Terminal") {
+                    Button("Add") {
                         guard let target = selectedTarget else { return }
-                        onOpen(target)
+                        onAdd(target)
                     }
                     .disabled(selectedTarget == nil)
                 }

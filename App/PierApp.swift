@@ -13,7 +13,7 @@ struct PierApp: App {
 
     private let modelContainer: ModelContainer = {
         do {
-            let schema = Schema([Host.self, NPMHost.self, SSHProfile.self])
+            let schema = Schema([Host.self, NPMHost.self, SSHProfile.self, KomodoTerminalProfile.self])
             let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
             return try ModelContainer(for: schema, configurations: [configuration])
         } catch {

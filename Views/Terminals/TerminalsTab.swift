@@ -29,6 +29,7 @@ struct TerminalsTab: View {
     @Environment(\.modelContext) private var modelContext
 
     @Query(sort: \SSHProfile.createdAt) private var sshProfiles: [SSHProfile]
+    @Query(sort: \KomodoTerminalProfile.createdAt) private var komodoProfiles: [KomodoTerminalProfile]
 
     @State private var filter: TerminalsFilter = .all
     @State private var komodoResources = TerminalsKomodoResources()
@@ -44,21 +45,22 @@ struct TerminalsTab: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                TrawlSegmentBar("Filter", selection: $filter, items: filterItems)
-                list
-            }
-            .navigationTitle("Terminals")
-            #if os(iOS)
-            .toolbarTitleDisplayMode(.large)
-            #endif
-            .toolbar { addMenu }
-            .task(id: hostManager.activeHostID) {
-                await loadKomodoResources()
-            }
-            .refreshable {
-                await loadKomodoResources()
-            }
+            list
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    TrawlSegmentBar("Filter", selection: $filter, items: filterItems)
+                }
+                .animation(.spring(response: 0.3, dampingFraction: 0.85), value: filter)
+                .navigationTitle("Terminals")
+                #if os(iOS)
+                .toolbarTitleDisplayMode(.large)
+                #endif
+                .toolbar { addMenu }
+                .task(id: hostManager.activeHostID) {
+                    await loadKomodoResources()
+                }
+                .refreshable {
+                    await loadKomodoResources()
+                }
         }
         .sheet(isPresented: $isShowingSSHSession, onDismiss: {
             sshSessionStore.wantsKeyboard = false
@@ -89,7 +91,7 @@ struct TerminalsTab: View {
                 resources: komodoResources
             ) { target in
                 komodoConfigKind = nil
-                openKomodoTerminal(target)
+                addKomodoProfile(target)
             }
         }
     }
@@ -103,10 +105,14 @@ struct TerminalsTab: View {
             }
 
             if hasActiveKomodoClient {
-                if showsSection(.server) { serverSection }
-                if showsSection(.container) { containerSection }
-                if showsSection(.stack) { stackSection }
-                if showsSection(.deployment) { deploymentSection }
+                if showsSection(.server) { profileSection(.server) }
+                if showsSection(.container) { profileSection(.container) }
+                if showsSection(.stack) { profileSection(.stack) }
+                if showsSection(.deployment) { profileSection(.deployment) }
+
+                if komodoProfilesForFilter.isEmpty {
+                    emptyKomodoHint
+                }
             } else if filter != .ssh {
                 noKomodoHostHint
             }
@@ -122,113 +128,40 @@ struct TerminalsTab: View {
         filter == .all || filter == section
     }
 
-    // MARK: - Komodo sections
+    // MARK: - Komodo sections (saved targets only)
 
+    /// One section per kind, listing only the targets the user has explicitly added via the "+"
+    /// menu for the active host. Empty kinds render nothing — the list is not a live inventory.
     @ViewBuilder
-    private var serverSection: some View {
-        Section("Servers") {
-            if hostManager.servers.isEmpty {
-                Text("No servers found.")
-                    .foregroundStyle(.secondary)
-                    .font(.subheadline)
-            } else {
-                ForEach(hostManager.servers) { server in
+    private func profileSection(_ kind: KomodoTerminalTarget.Kind) -> some View {
+        let items = profiles(for: kind)
+        if !items.isEmpty {
+            Section(kind.pluralLabel) {
+                ForEach(items) { profile in
                     Button {
-                        openKomodoTerminal(KomodoTerminalTarget(
-                            kind: .server,
-                            resourceID: server.id,
-                            name: server.name,
-                            subtitle: server.state.label
-                        ))
-                    } label: {
-                        KomodoTerminalRowView(icon: "server.rack", name: server.name, subtitle: server.state.label)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var containerSection: some View {
-        Section("Containers") {
-            if komodoResources.containers.isEmpty {
-                Text(komodoResources.isLoading ? "Loading…" : "No containers found.")
-                    .foregroundStyle(.secondary)
-                    .font(.subheadline)
-            } else {
-                ForEach(komodoResources.containers) { container in
-                    Button {
-                        openKomodoTerminal(KomodoTerminalTarget(
-                            kind: .container,
-                            resourceID: container.id,
-                            name: container.displayName,
-                            subtitle: containerSubtitle(container),
-                            serverID: container.serverID
-                        ))
+                        openKomodoTerminal(profile.target)
                     } label: {
                         KomodoTerminalRowView(
-                            icon: "shippingbox",
-                            name: container.displayName,
-                            subtitle: containerSubtitle(container)
+                            icon: kind.systemImage,
+                            name: profile.name,
+                            subtitle: profile.subtitle
                         )
                     }
                     .buttonStyle(.plain)
                 }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var stackSection: some View {
-        Section("Stacks") {
-            if komodoResources.stacks.isEmpty {
-                Text(komodoResources.isLoading ? "Loading…" : "No stacks found.")
-                    .foregroundStyle(.secondary)
-                    .font(.subheadline)
-            } else {
-                ForEach(komodoResources.stacks) { stack in
-                    let subtitle = "\(serverName(for: stack.serverID)) • \(stack.state.label)"
-                    Button {
-                        openKomodoTerminal(KomodoTerminalTarget(
-                            kind: .stack,
-                            resourceID: stack.id,
-                            name: stack.name,
-                            subtitle: subtitle,
-                            serviceName: stack.services.first?.service
-                        ))
-                    } label: {
-                        KomodoTerminalRowView(icon: "square.stack.3d.up", name: stack.name, subtitle: subtitle)
-                    }
-                    .buttonStyle(.plain)
+                .onDelete { offsets in
+                    deleteProfiles(items, at: offsets)
                 }
             }
         }
     }
 
-    @ViewBuilder
-    private var deploymentSection: some View {
-        Section("Deployments") {
-            if komodoResources.deployments.isEmpty {
-                Text(komodoResources.isLoading ? "Loading…" : "No deployments found.")
-                    .foregroundStyle(.secondary)
-                    .font(.subheadline)
-            } else {
-                ForEach(komodoResources.deployments) { deployment in
-                    let subtitle = "\(serverName(for: deployment.serverID)) • \(deployment.state.label)"
-                    Button {
-                        openKomodoTerminal(KomodoTerminalTarget(
-                            kind: .deployment,
-                            resourceID: deployment.id,
-                            name: deployment.name,
-                            subtitle: subtitle
-                        ))
-                    } label: {
-                        KomodoTerminalRowView(icon: "arrow.up.forward.app", name: deployment.name, subtitle: subtitle)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
+    private var emptyKomodoHint: some View {
+        Section {
+            Label("Tap + to add a server, container, stack, or deployment terminal",
+                  systemImage: "plus.circle")
+                .foregroundStyle(.secondary)
+                .font(.footnote)
         }
     }
 
@@ -288,18 +221,53 @@ struct TerminalsTab: View {
         komodoTerminalPresentation = KomodoTerminalPresentation(host: host, target: target)
     }
 
+    /// Persists a chosen target as a saved profile pinned to the active host, so it shows in the
+    /// list from now on. Silently ignores duplicates.
+    private func addKomodoProfile(_ target: KomodoTerminalTarget) {
+        guard let hostID = hostManager.activeHostID else { return }
+        let alreadySaved = komodoProfiles.contains {
+            $0.hostID == hostID && $0.kindRaw == target.kind.rawValue && $0.resourceID == target.resourceID
+        }
+        guard !alreadySaved else { return }
+        modelContext.insert(KomodoTerminalProfile(hostID: hostID, target: target))
+    }
+
+    private func deleteProfiles(_ items: [KomodoTerminalProfile], at offsets: IndexSet) {
+        for index in offsets {
+            modelContext.delete(items[index])
+        }
+    }
+
     // MARK: - Helpers
 
     private var hasActiveKomodoClient: Bool {
         hostManager.activeClient(in: modelContext) != nil
     }
 
-    private func serverName(for serverID: String) -> String {
-        hostManager.servers.first(where: { $0.id == serverID })?.name ?? serverID
+    /// Saved Komodo terminal profiles for the active host only — a resource id is only meaningful
+    /// on the Core that owns it.
+    private var activeHostProfiles: [KomodoTerminalProfile] {
+        guard let hostID = hostManager.activeHostID else { return [] }
+        return komodoProfiles.filter { $0.hostID == hostID }
     }
 
-    private func containerSubtitle(_ container: Container) -> String {
-        "\(serverName(for: container.serverID)) • \(container.status)"
+    private func profiles(for kind: KomodoTerminalTarget.Kind) -> [KomodoTerminalProfile] {
+        activeHostProfiles.filter { $0.kind == kind }
+    }
+
+    /// Saved profiles that would be shown under the current filter — used to decide whether to
+    /// show the "tap + to add" hint instead of a blank space.
+    private var komodoProfilesForFilter: [KomodoTerminalProfile] {
+        activeHostProfiles.filter { profile in
+            switch filter {
+            case .all: return true
+            case .server: return profile.kind == .server
+            case .container: return profile.kind == .container
+            case .stack: return profile.kind == .stack
+            case .deployment: return profile.kind == .deployment
+            case .ssh: return false
+            }
+        }
     }
 
     private var filterItems: [TrawlSegmentBarItem<TerminalsFilter>] {

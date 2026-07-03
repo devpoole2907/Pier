@@ -7,7 +7,10 @@ struct ContainerListFlatView: View {
     let isSelecting: Bool
 
     var body: some View {
-        List(selection: $selection) {
+        // Only bind the selection set while actively selecting. Otherwise a plain tap on a
+        // NavigationLink row can populate the set, leaving a phantom "1 selected" subtitle after
+        // navigating back even though edit mode was never entered.
+        List(selection: isSelecting ? $selection : .constant([])) {
             let visible = viewModel.visibleContainers
             let running = visible.filter { $0.state == .running }
             let other = visible.filter { $0.state != .running }
