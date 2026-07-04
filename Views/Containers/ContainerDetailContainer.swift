@@ -8,9 +8,10 @@ struct ContainerDetailContainer: View {
     let navigationValue: ContainerNavigationValue
 
     var body: some View {
-        ActiveHostGate { _, client in
+        ActiveHostGate { host, client in
             ContainerDetailView(
                 client: client,
+                hostID: host.id,
                 serverID: navigationValue.serverID,
                 containerID: navigationValue.containerID,
                 initialName: navigationValue.displayName

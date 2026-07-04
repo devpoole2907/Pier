@@ -7,6 +7,8 @@ struct ContainerDetailView: View {
     @State private var isShowingLogs = false
     @AppStorage("refreshIntervalSeconds") private var refreshIntervalRaw: Int = RefreshInterval.medium.rawValue
 
+    private let hostID: UUID
+
     private var isShowingActionError: Binding<Bool> {
         Binding(
             get: { viewModel.actionError != nil },
@@ -14,7 +16,8 @@ struct ContainerDetailView: View {
         )
     }
 
-    init(client: KomodoClient, serverID: String, containerID: String, initialName: String) {
+    init(client: KomodoClient, hostID: UUID, serverID: String, containerID: String, initialName: String) {
+        self.hostID = hostID
         _viewModel = State(initialValue: ContainerDetailViewModel(
             client: client,
             serverID: serverID,
@@ -107,7 +110,7 @@ struct ContainerDetailView: View {
                 EmptyStateView(title: "No data", systemImage: "tray")
             }
         } else if let detail = viewModel.detail {
-            ContainerDetailContent(viewModel: viewModel, detail: detail)
+            ContainerDetailContent(viewModel: viewModel, detail: detail, hostID: hostID)
         }
     }
 

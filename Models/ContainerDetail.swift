@@ -105,10 +105,23 @@ extension ContainerDetail: Decodable {
 
     struct NetworkSettings: Sendable {
         let networks: [String: NetworkInfo]
+        /// Published port mappings (`NetworkSettings.Ports`), flattened and de-duplicated.
+        let publishedPorts: [PublishedPort]
 
         private enum CodingKeys: String, CodingKey {
             case networks = "Networks"
+            case ports = "Ports"
         }
+    }
+
+    /// A container port published to the host, e.g. container `80/tcp` → host `13378`.
+    struct PublishedPort: Sendable, Hashable, Identifiable {
+        /// Container-side port + protocol, e.g. "80/tcp".
+        let containerPort: String
+        /// Host-side published port, e.g. "13378".
+        let hostPort: String
+
+        var id: String { "\(containerPort)->\(hostPort)" }
     }
 
     struct NetworkInfo: Sendable, Hashable {
@@ -162,9 +175,30 @@ extension ContainerDetail.Config: Decodable {
 }
 
 extension ContainerDetail.NetworkSettings: Decodable {
+    /// A single entry in Docker's `Ports` map value array, e.g. `{"HostIp":"0.0.0.0","HostPort":"13378"}`.
+    private struct PortMapEntry: Decodable {
+        let hostPort: String?
+        private enum CodingKeys: String, CodingKey { case hostPort = "HostPort" }
+    }
+
     nonisolated init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.networks = try container.decodeIfPresent([String: ContainerDetail.NetworkInfo].self, forKey: .networks) ?? [:]
+
+        // "Ports": { "80/tcp": [{"HostIp":"0.0.0.0","HostPort":"13378"}], "443/tcp": null }
+        let rawPorts = (try? container.decodeIfPresent([String: [PortMapEntry]?].self, forKey: .ports)) ?? [:]
+        var seen = Set<String>()
+        var mappings: [ContainerDetail.PublishedPort] = []
+        for (containerPort, entries) in (rawPorts ?? [:]) {
+            for entry in (entries ?? []) {
+                guard let hostPort = entry.hostPort, !hostPort.isEmpty else { continue }
+                let mapping = ContainerDetail.PublishedPort(containerPort: containerPort, hostPort: hostPort)
+                if seen.insert(mapping.id).inserted {
+                    mappings.append(mapping)
+                }
+            }
+        }
+        self.publishedPorts = mappings.sorted { $0.hostPort.localizedStandardCompare($1.hostPort) == .orderedAscending }
     }
 }
 

@@ -33,6 +33,9 @@ struct ContainerLogsView: View {
         .toolbar { logsToolbar }
         .searchable(text: $viewModel.searchText, prompt: "Search logs")
         .task { await viewModel.loadInitial() }
+        .onChange(of: viewModel.tailCount) {
+            Task { await viewModel.reload() }
+        }
         .onDisappear { viewModel.stopFollowing() }
         .sensoryFeedback(.success, trigger: copyFeedback)
     }
@@ -40,13 +43,27 @@ struct ContainerLogsView: View {
     @ToolbarContentBuilder
     private var logsToolbar: some ToolbarContent {
         ToolbarItem(placement: .platformTrailing) {
-            Button(viewModel.isFollowing ? "Stop Live Tail" : "Start Live Tail",
-                   systemImage: viewModel.isFollowing ? "dot.radiowaves.left.and.right" : "dot.radiowaves.right",
-                   action: toggleFollowing)
-                .help(viewModel.isFollowing ? "Stop streaming new log lines as they arrive." : "Start streaming new log lines as they arrive.")
-        }
-        ToolbarItem(placement: .platformTrailing) {
-            Button("Copy", systemImage: "doc.on.doc", action: copyToClipboard)
+            Menu {
+                Button(viewModel.isFollowing ? "Stop Live Tail" : "Start Live Tail",
+                       systemImage: viewModel.isFollowing ? "stop.circle" : "dot.radiowaves.right",
+                       action: toggleFollowing)
+
+                Button("Copy", systemImage: "doc.on.doc", action: copyToClipboard)
+
+                Divider()
+
+                Menu {
+                    Picker("Lines", selection: $viewModel.tailCount) {
+                        ForEach(LogsViewModel.lineOptions, id: \.self) { count in
+                            Text("\(count) lines").tag(count)
+                        }
+                    }
+                } label: {
+                    Label("Lines: \(viewModel.tailCount)", systemImage: "line.3.horizontal")
+                }
+            } label: {
+                Label("Log options", systemImage: "ellipsis.circle")
+            }
         }
     }
 

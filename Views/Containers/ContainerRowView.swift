@@ -4,10 +4,14 @@ import SwiftUI
 struct ContainerRowView: View {
     let container: Container
     let actionState: ContainerActionState?
+    /// Server name to show on the row, when the list is cross-server and not already grouped by
+    /// server. `nil` hides it (single-server scope, or the "By server" grouped view).
+    let serverName: String?
 
-    init(container: Container, actionState: ContainerActionState? = nil) {
+    init(container: Container, actionState: ContainerActionState? = nil, serverName: String? = nil) {
         self.container = container
         self.actionState = actionState
+        self.serverName = serverName
     }
 
     var body: some View {
@@ -22,6 +26,16 @@ struct ContainerRowView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
+                if let serverName {
+                    HStack(spacing: 4) {
+                        Image(systemName: "server.rack")
+                            .imageScale(.small)
+                        Text(serverName)
+                            .lineLimit(1)
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                }
                 if let statusText {
                     Text(statusText)
                         .font(.caption2)
@@ -87,15 +101,16 @@ struct SelectableContainerRow: View {
     let container: Container
     let viewModel: ContainerListViewModel
     let isSelecting: Bool
+    var serverName: String? = nil
 
     var body: some View {
         let actionState = viewModel.actionState(for: container)
         if isSelecting {
-            ContainerRowView(container: container, actionState: actionState)
+            ContainerRowView(container: container, actionState: actionState, serverName: serverName)
                 .tag(container.id)
         } else {
             NavigationLink(value: ContainerNavigationValue(containerID: container.id, serverID: container.serverID, displayName: container.displayName)) {
-                ContainerRowView(container: container, actionState: actionState)
+                ContainerRowView(container: container, actionState: actionState, serverName: serverName)
             }
             .tag(container.id)
             .disabled(actionState != nil)
@@ -105,6 +120,64 @@ struct SelectableContainerRow: View {
             .contextMenu {
                 ContainerContextMenu(container: container, viewModel: viewModel)
             }
+            // Attached to the row (the same view that owns the context menu) and gated to this
+            // container, so the dialog morphs out of the row's context-menu preview instead of
+            // detaching from the parent list.
+            .confirmationDialog(
+                dialogTitle,
+                isPresented: dialogPresented,
+                titleVisibility: .visible,
+                presenting: viewModel.pendingDestructiveAction
+            ) { pending in
+                Button(confirmLabel(for: pending.action), role: .destructive) {
+                    Task { await viewModel.confirmDestructiveAction() }
+                }
+                Button("Cancel", role: .cancel) { viewModel.pendingDestructiveAction = nil }
+            } message: { pending in
+                Text(dialogMessage(for: pending))
+            }
+        }
+    }
+
+    /// Only the row whose container matches the pending action presents the dialog, so it anchors
+    /// to that row rather than every row trying to present the shared state.
+    private var dialogPresented: Binding<Bool> {
+        Binding(
+            get: { viewModel.pendingDestructiveAction?.container.id == container.id },
+            set: { presented in
+                if !presented, viewModel.pendingDestructiveAction?.container.id == container.id {
+                    viewModel.pendingDestructiveAction = nil
+                }
+            }
+        )
+    }
+
+    private var dialogTitle: String {
+        switch viewModel.pendingDestructiveAction?.action {
+        case .stop: "Stop container?"
+        case .restart: "Restart container?"
+        case .kill: "Kill container?"
+        case .delete: "Delete container?"
+        case nil: ""
+        }
+    }
+
+    private func confirmLabel(for action: DestructiveAction) -> String {
+        switch action {
+        case .stop: "Stop"
+        case .restart: "Restart"
+        case .kill: "Kill"
+        case .delete: "Delete"
+        }
+    }
+
+    private func dialogMessage(for pending: PendingContainerAction) -> String {
+        let name = pending.container.displayName
+        switch pending.action {
+        case .stop: return "This stops \(name) gracefully."
+        case .restart: return "This restarts \(name)."
+        case .kill: return "This sends SIGKILL to \(name) immediately."
+        case .delete: return "This removes \(name). It cannot be undone."
         }
     }
 }

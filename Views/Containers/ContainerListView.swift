@@ -51,7 +51,6 @@ struct ContainerListView: View {
         .searchable(text: $viewModel.searchText, prompt: "Search containers")
         .refreshable { await viewModel.refresh(includeStopped: showStoppedContainers) }
         .toolbar { selectionToolbar }
-        .alert(item: $viewModel.pendingDestructiveAction, content: destructiveContainerAlert)
         .alert(item: $pendingBulkAction, content: bulkContainerAlert)
         .task(id: showStoppedContainers) {
             await viewModel.load(includeStopped: showStoppedContainers)
@@ -193,40 +192,6 @@ struct ContainerListView: View {
 
     private var startableContainers: [Container] {
         selectedContainers.filter { $0.state != .running }
-    }
-
-    private func destructiveContainerAlert(for pending: PendingContainerAction) -> Alert {
-        let container = pending.container
-        switch pending.action {
-        case .stop:
-            return Alert(
-                title: Text("Stop container?"),
-                message: Text("This stops \(container.displayName) gracefully."),
-                primaryButton: .destructive(Text("Stop")) { Task { await viewModel.confirmDestructiveAction() } },
-                secondaryButton: .cancel()
-            )
-        case .restart:
-            return Alert(
-                title: Text("Restart container?"),
-                message: Text("This restarts \(container.displayName)."),
-                primaryButton: .destructive(Text("Restart")) { Task { await viewModel.confirmDestructiveAction() } },
-                secondaryButton: .cancel()
-            )
-        case .kill:
-            return Alert(
-                title: Text("Kill container?"),
-                message: Text("This sends SIGKILL to \(container.displayName) immediately."),
-                primaryButton: .destructive(Text("Kill")) { Task { await viewModel.confirmDestructiveAction() } },
-                secondaryButton: .cancel()
-            )
-        case .delete:
-            return Alert(
-                title: Text("Delete container?"),
-                message: Text("This removes \(container.displayName). It cannot be undone."),
-                primaryButton: .destructive(Text("Delete")) { Task { await viewModel.confirmDestructiveAction() } },
-                secondaryButton: .cancel()
-            )
-        }
     }
 
     private func bulkContainerAlert(for action: BulkContainerAction) -> Alert {
