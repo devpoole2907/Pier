@@ -4,7 +4,7 @@ import Foundation
 /// type-safe (per `views.md`: prefer enum values over integer/string tags).
 enum AppDestination: String, Hashable, CaseIterable, Identifiable {
     case dashboard
-    case containers
+    case stacks
     case terminals
     case proxy
     case more
@@ -14,7 +14,7 @@ enum AppDestination: String, Hashable, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .dashboard: "Dashboard"
-        case .containers: "Containers"
+        case .stacks: "Stacks"
         case .terminals: "Terminals"
         case .proxy: "Proxy"
         case .more: "More"
@@ -24,7 +24,7 @@ enum AppDestination: String, Hashable, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .dashboard: "square.grid.2x2.fill"
-        case .containers: "shippingbox.fill"
+        case .stacks: "square.stack.3d.up.fill"
         case .terminals: "terminal.fill"
         case .proxy: "arrow.triangle.branch"
         case .more: "ellipsis.circle"

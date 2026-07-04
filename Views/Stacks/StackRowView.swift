@@ -10,16 +10,11 @@ struct StackRowView: View {
                 .imageScale(.large)
                 .foregroundStyle(stack.state.color)
                 .frame(width: 32)
-            VStack(alignment: .leading, spacing: DesignSystem.Spacing.tight) {
-                Text(stack.name)
-                    .font(.body)
-                    .fontWeight(.medium)
-                if !stack.statusText.isEmpty {
-                    Text(stack.statusText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
+            // Status (e.g. "running(1)") is intentionally omitted here — the trailing state label
+            // already reports it, so repeating it in a subtitle is redundant.
+            Text(stack.name)
+                .font(.body)
+                .fontWeight(.medium)
             Spacer()
             Text(stack.state.label)
                 .font(.caption)

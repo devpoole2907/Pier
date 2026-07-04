@@ -37,7 +37,7 @@ struct StackDetailView: View {
                 }
             }
 
-            StackServicesSection(stackName: stack.name, viewModel: containerListVM)
+            StackServicesSection(stack: stack, viewModel: containerListVM)
 
             Section("Compose file") {
                 Button("View / edit YAML", systemImage: "doc.text") {
@@ -49,16 +49,29 @@ struct StackDetailView: View {
             }
         }
         .navigationTitle(stack.name)
+        .navigationSubtitle(fileSubtitle)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar { toolbarContent }
         .task {
-            await containerListVM.load()
+            async let containers: Void = containerListVM.load()
+            async let file: Void = viewModel.loadFile(for: stack)
+            _ = await (containers, file)
         }
         .sheet(isPresented: $isShowingEditor) {
             NavigationStack {
-                StackEditorView(initialContent: viewModel.file?.contents ?? "", stackName: stack.name)
+                StackEditorView(
+                    initialContent: viewModel.file?.contents ?? "",
+                    filePath: viewModel.file?.path ?? "",
+                    stackName: stack.name
+                ) { newContents in
+                    await viewModel.saveFile(
+                        stackID: stack.id,
+                        path: viewModel.file?.path ?? "",
+                        contents: newContents
+                    )
+                }
             }
         }
         .alert("Delete stack?", isPresented: $pendingDelete) {
@@ -79,10 +92,34 @@ struct StackDetailView: View {
         }
     }
 
+    /// Compose file path (or name) for the nav subtitle, once loaded. Falls back to the server
+    /// name so the subtitle isn't empty before the file resolves.
+    private var fileSubtitle: String {
+        if let path = viewModel.file?.path, !path.isEmpty {
+            return path
+        }
+        return ""
+    }
+
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .platformTrailing) {
             Menu("Actions", systemImage: "ellipsis.circle") {
+                Button("Pull", systemImage: "arrow.down.circle") {
+                    Task { await viewModel.pull(stack) }
+                }
+                if stack.isActive {
+                    Button("Deploy", systemImage: "arrow.triangle.pull") {
+                        Task { await viewModel.deployIfChanged(stack) }
+                    }
+                    Button("Pull & Deploy", systemImage: "arrow.trianglehead.clockwise") {
+                        Task {
+                            await viewModel.pull(stack)
+                            await viewModel.deploy(stack)
+                        }
+                    }
+                }
+
                 if stack.isActive {
                     Button("Stop stack", systemImage: "stop.fill") {
                         pendingStop = true

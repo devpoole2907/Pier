@@ -4,30 +4,33 @@ import SwiftUI
 enum MoreDestination: Hashable {
     case servers
     case alerts
-    case stacks
+    case containers
     case deployments
     case variables
     case images
+    case procedures
     case settings
 }
 
 enum MoreDestinationAccent {
     case servers
     case alerts
-    case stacks
+    case containers
     case deployments
     case variables
     case images
+    case procedures
     case settings
 
     var color: Color {
         switch self {
         case .servers: .blue
         case .alerts: .red
-        case .stacks: .indigo
+        case .containers: .cyan
         case .deployments: .teal
         case .variables: .brown
         case .images: .orange
+        case .procedures: .purple
         case .settings: .secondary
         }
     }
@@ -36,7 +39,10 @@ enum MoreDestinationAccent {
 struct MoreTab: View {
     @Environment(HostManager.self) private var hostManager
     @Environment(\.modelContext) private var modelContext
-    @State private var path: [MoreDestination] = []
+    // Type-erased: a homogeneous `[MoreDestination]` path can only hold MoreDestination values, so
+    // pushing a `Stack` (from a stack-row NavigationLink) would silently no-op. NavigationPath
+    // carries both MoreDestination and Stack pushes.
+    @State private var path = NavigationPath()
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -53,9 +59,9 @@ struct MoreTab: View {
                 }
 
                 Section("Resources") {
-                    NavigationLink(value: MoreDestination.stacks) {
-                        moreRow(icon: "square.stack.3d.up.fill", color: MoreDestinationAccent.stacks.color,
-                                title: "Stacks", subtitle: "Compose stacks and services")
+                    NavigationLink(value: MoreDestination.containers) {
+                        moreRow(icon: "shippingbox.fill", color: MoreDestinationAccent.containers.color,
+                                title: "Containers", subtitle: "Running containers and images")
                     }
                     NavigationLink(value: MoreDestination.deployments) {
                         moreRow(icon: "shippingbox.fill", color: MoreDestinationAccent.deployments.color,
@@ -71,6 +77,13 @@ struct MoreTab: View {
                     }
                 }
 
+                Section("Automation") {
+                    NavigationLink(value: MoreDestination.procedures) {
+                        moreRow(icon: "list.bullet.clipboard.fill", color: MoreDestinationAccent.procedures.color,
+                                title: "Procedures", subtitle: "Run multi-stage automation")
+                    }
+                }
+
                 Section {
                     NavigationLink(value: MoreDestination.settings) {
                         moreRow(icon: "gearshape.fill", color: MoreDestinationAccent.settings.color,
@@ -80,13 +93,26 @@ struct MoreTab: View {
             }
             #if os(iOS)
             .listStyle(.insetGrouped)
-            .toolbarTitleDisplayMode(.large)
+            .toolbarTitleDisplayMode(.inlineLarge)
             #else
             .listStyle(.inset)
             #endif
+            .softScrollEdges()
             .navigationTitle("More")
             .navigationDestination(for: MoreDestination.self) { destination in
                 destinationView(for: destination)
+            }
+            // Declared at the stack root (not inside the pushed Stacks destination) so the push
+            // actually registers — a nested navigationDestination leaves stack-row taps as a
+            // highlight that goes nowhere.
+            .navigationDestination(for: Stack.self) { stack in
+                StackDetailContainer(stack: stack)
+            }
+            // Stack detail links its services to container detail, so this stack must know how to
+            // resolve a ContainerNavigationValue too (it's only registered in ContainersTab
+            // otherwise).
+            .navigationDestination(for: ContainerNavigationValue.self) { value in
+                ContainerDetailContainer(navigationValue: value)
             }
         }
     }
@@ -105,15 +131,13 @@ struct MoreTab: View {
                 .hostTitleMenu()
                 .moreDestinationTitleStyle()
                 .moreDestinationBackground(.alerts)
-        case .stacks:
-            StacksContainer()
-                .navigationTitle("Stacks")
+        case .containers:
+            ContainerListContainer()
+                .navigationTitle("Containers")
                 .hostTitleMenu()
-                .navigationDestination(for: Stack.self) { stack in
-                    StackDetailContainer(stack: stack)
-                }
+                .serverScopeMenu()
                 .moreDestinationTitleStyle()
-                .moreDestinationBackground(.stacks)
+                .moreDestinationBackground(.containers)
         case .deployments:
             DeploymentsContainer()
                 .navigationTitle("Deployments")
@@ -134,6 +158,11 @@ struct MoreTab: View {
                 .serverScopeMenu()
                 .moreDestinationTitleStyle()
                 .moreDestinationBackground(.images)
+        case .procedures:
+            ProceduresContainer()
+                .hostTitleMenu()
+                .moreDestinationTitleStyle()
+                .moreDestinationBackground(.procedures)
         case .settings:
             SettingsView()
                 .navigationTitle("Settings")
@@ -152,6 +181,11 @@ struct MoreDestinationGradientBackground: View {
 
     var body: some View {
         ZStack {
+            // Solid base matching the inset-grouped list backdrop so the accent tint fades into the
+            // grouped-list background (off-white in light mode / black in dark) rather than pure
+            // white. Mirrors ProxyDestinationGradientBackground.
+            Color.groupedListBackground
+
             LinearGradient(
                 colors: [accent.color.opacity(0.18), Color.clear],
                 startPoint: .top,

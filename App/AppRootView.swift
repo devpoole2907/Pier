@@ -8,6 +8,8 @@ struct AppRootView: View {
     @Environment(HostManager.self) private var hostManager
     @Environment(NPMHostManager.self) private var npmHostManager
     @Environment(SSHSessionStore.self) private var sshSessionStore
+    @Environment(InAppNotificationCenter.self) private var inAppNotificationCenter
+    @Environment(\.scenePhase) private var scenePhase
     @Query(sort: \Host.createdAt) private var hosts: [Host]
     @Query(sort: \NPMHost.createdAt) private var npmHosts: [NPMHost]
     @Query(sort: \SSHProfile.createdAt) private var sshProfiles: [SSHProfile]
@@ -17,9 +19,14 @@ struct AppRootView: View {
     @State private var isInWelcomeFlow = true
     @State private var setupTarget: SetupTarget?
     @State private var didEvaluateWelcomeState = false
+    #if os(iOS)
+    @State private var notificationWindowPresenter = InAppNotificationWindowPresenter()
+    #endif
 
     var body: some View {
-        Group {
+        @Bindable var inAppNotificationCenter = inAppNotificationCenter
+
+        return Group {
             if shouldShowWelcomeScreen {
                 welcomeScreen
             } else {
@@ -29,9 +36,21 @@ struct AppRootView: View {
         .sheet(item: $setupTarget) { target in
             setupSheet(for: target)
         }
+        .sheet(isPresented: $inAppNotificationCenter.isPresentingRecentNotifications) {
+            RecentNotificationsView()
+                .environment(inAppNotificationCenter)
+        }
         .onAppear {
             evaluateInitialWelcomeStateIfNeeded()
+            #if os(iOS)
+            notificationWindowPresenter.install(notificationCenter: inAppNotificationCenter)
+            #endif
         }
+        #if os(iOS)
+        .onChange(of: scenePhase) { _, _ in
+            notificationWindowPresenter.install(notificationCenter: inAppNotificationCenter)
+        }
+        #endif
         .onOpenURL(perform: handleOpenURL)
     }
 
@@ -55,11 +74,23 @@ struct AppRootView: View {
                 NavigationStack {
                     DashboardContainer()
                         .navigationTitle("Dashboard")
+                        #if os(iOS)
+                        .toolbarTitleDisplayMode(.inlineLarge)
+                        #endif
                         .hostTitleMenu()
+                        .toolbar {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                Button {
+                                    inAppNotificationCenter.showRecentNotifications()
+                                } label: {
+                                    Image(systemName: inAppNotificationCenter.unreadCount > 0 ? "bell.badge" : "bell")
+                                }
+                            }
+                        }
                 }
             }
-            Tab(AppDestination.containers.displayName, systemImage: AppDestination.containers.systemImage, value: .containers) {
-                ContainersTab()
+            Tab(AppDestination.stacks.displayName, systemImage: AppDestination.stacks.systemImage, value: .stacks) {
+                StacksTab()
             }
             Tab(AppDestination.terminals.displayName, systemImage: AppDestination.terminals.systemImage, value: .terminals) {
                 TerminalsTab()

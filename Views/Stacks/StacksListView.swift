@@ -29,11 +29,15 @@ struct StacksListView: View {
                     message: "Compose stacks managed by Portainer will appear here."
                 )
             } else {
-                List(selection: $selectedStackIDs) {
+                // Only bind the selection set while actively selecting. Otherwise a plain tap on a
+                // NavigationLink row can populate the set, leaving a phantom "1 selected" subtitle after
+                // navigating back even though edit mode was never entered.
+                List(selection: isSelecting ? $selectedStackIDs : .constant([])) {
                     ForEach(viewModel.stacks) { stack in
                         row(for: stack)
                     }
                 }
+                .softScrollEdges()
             }
         }
         .environment(\.editMode, $editMode)
