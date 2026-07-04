@@ -41,25 +41,33 @@ final class NPMProxyHostsViewModel {
     }
 
     func setEnabled(_ id: Int, enabled: Bool) async {
+        let displayName = items.first(where: { $0.id == id })?.domain_names.joined(separator: ", ") ?? "Proxy Host"
         let state: NPMActionState = enabled ? .enabling : .disabling
         actionStates[id] = state
         defer { actionStates[id] = nil }
         do {
             try await client.setProxyHostEnabled(id: id, enabled: enabled)
             await load()
+            InAppNotificationCenter.shared.showSuccess(title: enabled ? "Proxy Host Enabled" : "Proxy Host Disabled", message: displayName)
         } catch {
-            loadError = NPMError.from(error)
+            let npmError = NPMError.from(error)
+            loadError = npmError
+            InAppNotificationCenter.shared.reportFailure(enabled ? "Enable Proxy Host" : "Disable Proxy Host", error: npmError)
         }
     }
 
     func delete(_ id: Int) async {
+        let displayName = items.first(where: { $0.id == id })?.domain_names.joined(separator: ", ") ?? "Proxy Host"
         actionStates[id] = .deleting
         defer { actionStates[id] = nil }
         do {
             try await client.deleteProxyHost(id: id)
             await load()
+            InAppNotificationCenter.shared.showSuccess(title: "Proxy Host Deleted", message: displayName)
         } catch {
-            loadError = NPMError.from(error)
+            let npmError = NPMError.from(error)
+            loadError = npmError
+            InAppNotificationCenter.shared.reportFailure("Delete Proxy Host", error: npmError)
         }
     }
 
@@ -68,8 +76,11 @@ final class NPMProxyHostsViewModel {
             _ = try await client.createProxyHost(payload)
             loadError = nil
             await load()
+            InAppNotificationCenter.shared.showSuccess(title: "Proxy Host Created", message: payload.domain_names.joined(separator: ", "))
         } catch {
-            loadError = NPMError.from(error)
+            let npmError = NPMError.from(error)
+            loadError = npmError
+            InAppNotificationCenter.shared.reportFailure("Create Proxy Host", error: npmError)
         }
     }
 
@@ -78,8 +89,11 @@ final class NPMProxyHostsViewModel {
             _ = try await client.updateProxyHost(id: id, payload)
             loadError = nil
             await load()
+            InAppNotificationCenter.shared.showSuccess(title: "Proxy Host Updated", message: payload.domain_names.joined(separator: ", "))
         } catch {
-            loadError = NPMError.from(error)
+            let npmError = NPMError.from(error)
+            loadError = npmError
+            InAppNotificationCenter.shared.reportFailure("Update Proxy Host", error: npmError)
         }
     }
 

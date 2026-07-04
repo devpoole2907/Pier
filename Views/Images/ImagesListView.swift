@@ -45,11 +45,15 @@ struct ImagesListView: View {
                 } else if viewModel.visibleItems.isEmpty {
                     ContentUnavailableView.search
                 } else {
-                    List(selection: $selectedImageIDs) {
+                    // Only bind the selection set while actively selecting. Otherwise a plain tap on a
+                    // NavigationLink row can populate the set, leaving a phantom "1 selected" subtitle after
+                    // navigating back even though edit mode was never entered.
+                    List(selection: isSelecting ? $selectedImageIDs : .constant([])) {
                         ForEach(viewModel.visibleItems) { item in
                             row(for: item)
                         }
                     }
+                    .softScrollEdges()
                 }
             }
         }

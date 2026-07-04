@@ -35,6 +35,7 @@ struct DashboardView: View {
                     .padding(DesignSystem.Spacing.large)
                 }
                 .background(Color.groupedListBackground)
+                .softScrollEdges()
             }
         }
         .refreshable { await viewModel.load() }

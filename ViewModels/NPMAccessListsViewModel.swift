@@ -39,13 +39,17 @@ final class NPMAccessListsViewModel {
     }
 
     func delete(_ id: Int) async {
+        let displayName = items.first(where: { $0.id == id })?.name ?? "Access List"
         actionStates[id] = .deleting
         defer { actionStates[id] = nil }
         do {
             try await client.deleteAccessList(id: id)
             await load()
+            InAppNotificationCenter.shared.showSuccess(title: "Access List Deleted", message: displayName)
         } catch {
-            loadError = NPMError.from(error)
+            let npmError = NPMError.from(error)
+            loadError = npmError
+            InAppNotificationCenter.shared.reportFailure("Delete Access List", error: npmError)
         }
     }
 
@@ -54,8 +58,11 @@ final class NPMAccessListsViewModel {
             _ = try await client.createAccessList(payload)
             loadError = nil
             await load()
+            InAppNotificationCenter.shared.showSuccess(title: "Access List Created", message: payload.name)
         } catch {
-            loadError = NPMError.from(error)
+            let npmError = NPMError.from(error)
+            loadError = npmError
+            InAppNotificationCenter.shared.reportFailure("Create Access List", error: npmError)
         }
     }
 
@@ -64,8 +71,11 @@ final class NPMAccessListsViewModel {
             _ = try await client.updateAccessList(id: id, payload)
             loadError = nil
             await load()
+            InAppNotificationCenter.shared.showSuccess(title: "Access List Updated", message: payload.name)
         } catch {
-            loadError = NPMError.from(error)
+            let npmError = NPMError.from(error)
+            loadError = npmError
+            InAppNotificationCenter.shared.reportFailure("Update Access List", error: npmError)
         }
     }
 }

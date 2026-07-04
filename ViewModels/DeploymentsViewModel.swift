@@ -127,8 +127,11 @@ final class DeploymentsViewModel {
         do {
             try await body()
             await load()
+            InAppNotificationCenter.shared.showSuccess(title: actionState.successTitle, message: deployment.name)
         } catch {
-            self.loadError = KomodoError.from(error)
+            let komodoError = KomodoError.from(error)
+            self.loadError = komodoError
+            InAppNotificationCenter.shared.reportFailure(actionState.failureActionName, error: komodoError)
         }
     }
 }
@@ -174,6 +177,32 @@ enum DeploymentActionState: String, Sendable {
         case .deploying, .pulling, .starting: .green
         case .stopping, .restarting, .pausing, .unpausing: .yellow
         case .destroying: .red
+        }
+    }
+
+    var successTitle: String {
+        switch self {
+        case .deploying: "Deployment Deployed"
+        case .pulling: "Deployment Pulled"
+        case .starting: "Deployment Started"
+        case .stopping: "Deployment Stopped"
+        case .restarting: "Deployment Restarted"
+        case .pausing: "Deployment Paused"
+        case .unpausing: "Deployment Resumed"
+        case .destroying: "Deployment Destroyed"
+        }
+    }
+
+    var failureActionName: String {
+        switch self {
+        case .deploying: "Deploy Deployment"
+        case .pulling: "Pull Deployment"
+        case .starting: "Start Deployment"
+        case .stopping: "Stop Deployment"
+        case .restarting: "Restart Deployment"
+        case .pausing: "Pause Deployment"
+        case .unpausing: "Resume Deployment"
+        case .destroying: "Destroy Deployment"
         }
     }
 }

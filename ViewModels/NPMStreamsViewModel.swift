@@ -42,25 +42,33 @@ final class NPMStreamsViewModel {
     }
 
     func setEnabled(_ id: Int, enabled: Bool) async {
+        let displayName = items.first(where: { $0.id == id }).map { "Port \($0.incoming_port)" } ?? "Stream"
         let state: NPMActionState = enabled ? .enabling : .disabling
         actionStates[id] = state
         defer { actionStates[id] = nil }
         do {
             try await client.setStreamEnabled(id: id, enabled: enabled)
             await load()
+            InAppNotificationCenter.shared.showSuccess(title: enabled ? "Stream Enabled" : "Stream Disabled", message: displayName)
         } catch {
-            loadError = NPMError.from(error)
+            let npmError = NPMError.from(error)
+            loadError = npmError
+            InAppNotificationCenter.shared.reportFailure(enabled ? "Enable Stream" : "Disable Stream", error: npmError)
         }
     }
 
     func delete(_ id: Int) async {
+        let displayName = items.first(where: { $0.id == id }).map { "Port \($0.incoming_port)" } ?? "Stream"
         actionStates[id] = .deleting
         defer { actionStates[id] = nil }
         do {
             try await client.deleteStream(id: id)
             await load()
+            InAppNotificationCenter.shared.showSuccess(title: "Stream Deleted", message: displayName)
         } catch {
-            loadError = NPMError.from(error)
+            let npmError = NPMError.from(error)
+            loadError = npmError
+            InAppNotificationCenter.shared.reportFailure("Delete Stream", error: npmError)
         }
     }
 
@@ -69,8 +77,11 @@ final class NPMStreamsViewModel {
             _ = try await client.createStream(payload)
             loadError = nil
             await load()
+            InAppNotificationCenter.shared.showSuccess(title: "Stream Created", message: "Port \(payload.incoming_port)")
         } catch {
-            loadError = NPMError.from(error)
+            let npmError = NPMError.from(error)
+            loadError = npmError
+            InAppNotificationCenter.shared.reportFailure("Create Stream", error: npmError)
         }
     }
 
@@ -79,8 +90,11 @@ final class NPMStreamsViewModel {
             _ = try await client.updateStream(id: id, payload)
             loadError = nil
             await load()
+            InAppNotificationCenter.shared.showSuccess(title: "Stream Updated", message: "Port \(payload.incoming_port)")
         } catch {
-            loadError = NPMError.from(error)
+            let npmError = NPMError.from(error)
+            loadError = npmError
+            InAppNotificationCenter.shared.reportFailure("Update Stream", error: npmError)
         }
     }
 }

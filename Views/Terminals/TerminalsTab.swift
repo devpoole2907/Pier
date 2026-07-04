@@ -52,7 +52,7 @@ struct TerminalsTab: View {
                 .animation(.spring(response: 0.3, dampingFraction: 0.85), value: filter)
                 .navigationTitle("Terminals")
                 #if os(iOS)
-                .toolbarTitleDisplayMode(.large)
+                .toolbarTitleDisplayMode(.inlineLarge)
                 #endif
                 .toolbar { addMenu }
                 .task(id: hostManager.activeHostID) {
@@ -110,7 +110,7 @@ struct TerminalsTab: View {
                 if showsSection(.stack) { profileSection(.stack) }
                 if showsSection(.deployment) { profileSection(.deployment) }
 
-                if komodoProfilesForFilter.isEmpty {
+                if isKomodoKindFilter, komodoProfilesForFilter.isEmpty {
                     emptyKomodoHint
                 }
             } else if filter != .ssh {
@@ -122,10 +122,21 @@ struct TerminalsTab: View {
         #else
         .listStyle(.inset)
         #endif
+        .softScrollEdges()
     }
 
     private func showsSection(_ section: TerminalsFilter) -> Bool {
         filter == .all || filter == section
+    }
+
+    /// True only when the filter isolates a specific Komodo kind. The "tap + to add" hint is scoped
+    /// to these — it must never appear under All or the SSH filter (where it's just noise below the
+    /// SSH hosts).
+    private var isKomodoKindFilter: Bool {
+        switch filter {
+        case .server, .container, .stack, .deployment: true
+        case .all, .ssh: false
+        }
     }
 
     // MARK: - Komodo sections (saved targets only)

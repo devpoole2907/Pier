@@ -2,9 +2,17 @@ import SwiftUI
 
 /// Flat list, sorted by status (running first), then alphabetically.
 struct ContainerListFlatView: View {
+    @Environment(HostManager.self) private var hostManager
     @Bindable var viewModel: ContainerListViewModel
     @Binding var selection: Set<String>
     let isSelecting: Bool
+
+    /// Show the per-row server only when the list spans all servers (no server scope selected) and
+    /// there's more than one server — otherwise the server is already implied by the scope, and the
+    /// "By server" grouping handles its own case.
+    private var showsServer: Bool {
+        hostManager.activeServerID == nil && hostManager.servers.count > 1
+    }
 
     var body: some View {
         // Only bind the selection set while actively selecting. Otherwise a plain tap on a
@@ -31,6 +39,7 @@ struct ContainerListFlatView: View {
                 }
             }
         }
+        .softScrollEdges()
     }
 
     @ViewBuilder
@@ -38,7 +47,12 @@ struct ContainerListFlatView: View {
         SelectableContainerRow(
             container: container,
             viewModel: viewModel,
-            isSelecting: isSelecting
+            isSelecting: isSelecting,
+            serverName: showsServer ? serverName(for: container.serverID) : nil
         )
+    }
+
+    private func serverName(for serverID: String) -> String {
+        hostManager.servers.first(where: { $0.id == serverID })?.name ?? serverID
     }
 }

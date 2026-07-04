@@ -75,6 +75,7 @@ struct SettingsView: View {
                 }
             }
         }
+        .softScrollEdges()
     }
 
     private var versionString: String {

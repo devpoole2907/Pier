@@ -40,6 +40,7 @@ struct ServersDashboardView: View {
                         }
                     }
                 }
+                .softScrollEdges()
             }
         }
         .refreshable { await viewModel.load() }

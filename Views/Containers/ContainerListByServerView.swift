@@ -22,6 +22,7 @@ struct ContainerListByServerView: View {
                 }
             }
         }
+        .softScrollEdges()
     }
 
     private func serverName(for serverID: String) -> String {

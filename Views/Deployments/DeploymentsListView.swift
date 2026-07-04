@@ -38,6 +38,7 @@ struct DeploymentsListView: View {
                         row(for: deployment)
                     }
                 }
+                .softScrollEdges()
             }
         }
         .navigationDestination(for: Deployment.self) { deployment in

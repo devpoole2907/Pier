@@ -21,16 +21,14 @@ struct LogsScrollView: View {
                         ))
                         .id(line.id)
                 }
-                if !viewModel.isFollowing {
-                    Button("Load more") {
-                        Task { await viewModel.loadMore() }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .listRowBackground(Color.clear)
-                }
             }
             .listStyle(.plain)
-            .onChange(of: viewModel.visibleLines.count) {
+            .softScrollEdges()
+            // Track content, not just line count: once the buffer fills to `tailCount` the count
+            // stops changing, so keying on count alone would stop tailing. Observing `lines`
+            // (Equatable) fires on every poll that brings new text, keeping the newest line pinned
+            // to the bottom while live-tailing.
+            .onChange(of: viewModel.lines) {
                 guard viewModel.isFollowing, let lastID = viewModel.visibleLines.last?.id else { return }
                 withAnimation(DesignSystem.Animation.standard) {
                     proxy.scrollTo(lastID, anchor: .bottom)

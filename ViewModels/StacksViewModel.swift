@@ -63,9 +63,12 @@ final class StacksViewModel {
             try await client.writeStackFile(stackID: stackID, path: path, contents: contents)
             self.file = StackFileContent(path: path, contents: contents)
             self.loadError = nil
+            InAppNotificationCenter.shared.showSuccess(title: "Compose File Saved", message: path)
             return true
         } catch {
-            self.loadError = KomodoError.from(error)
+            let komodoError = KomodoError.from(error)
+            self.loadError = komodoError
+            InAppNotificationCenter.shared.reportFailure("Save Compose File", error: komodoError)
             return false
         }
     }
@@ -188,8 +191,11 @@ final class StacksViewModel {
         do {
             try await body()
             await load()
+            InAppNotificationCenter.shared.showSuccess(title: actionState.successTitle, message: stack.name)
         } catch {
-            self.loadError = KomodoError.from(error)
+            let komodoError = KomodoError.from(error)
+            self.loadError = komodoError
+            InAppNotificationCenter.shared.reportFailure(actionState.failureActionName, error: komodoError)
         }
     }
 
@@ -211,8 +217,12 @@ final class StacksViewModel {
                 try await operation(stack)
             }
             await load()
+            let message = stacks.count == 1 ? stacks[0].name : "\(stacks.count) stacks"
+            InAppNotificationCenter.shared.showSuccess(title: actionState.successTitlePlural, message: message)
         } catch {
-            self.loadError = KomodoError.from(error)
+            let komodoError = KomodoError.from(error)
+            self.loadError = komodoError
+            InAppNotificationCenter.shared.reportFailure(actionState.failureActionName, error: komodoError)
         }
     }
 }
@@ -249,5 +259,44 @@ enum StackActionState: String, Sendable {
 
     var rowDetailText: String {
         "\(displayName) request in progress"
+    }
+
+    var successTitle: String {
+        switch self {
+        case .deploying: "Stack Deployed"
+        case .pulling: "Stack Pulled"
+        case .starting: "Stack Started"
+        case .stopping: "Stack Stopped"
+        case .restarting: "Stack Restarted"
+        case .pausing: "Stack Paused"
+        case .unpausing: "Stack Resumed"
+        case .destroying: "Stack Destroyed"
+        }
+    }
+
+    var successTitlePlural: String {
+        switch self {
+        case .deploying: "Stacks Deployed"
+        case .pulling: "Stacks Pulled"
+        case .starting: "Stacks Started"
+        case .stopping: "Stacks Stopped"
+        case .restarting: "Stacks Restarted"
+        case .pausing: "Stacks Paused"
+        case .unpausing: "Stacks Resumed"
+        case .destroying: "Stacks Destroyed"
+        }
+    }
+
+    var failureActionName: String {
+        switch self {
+        case .deploying: "Deploy Stack"
+        case .pulling: "Pull Stack"
+        case .starting: "Start Stack"
+        case .stopping: "Stop Stack"
+        case .restarting: "Restart Stack"
+        case .pausing: "Pause Stack"
+        case .unpausing: "Resume Stack"
+        case .destroying: "Destroy Stack"
+        }
     }
 }

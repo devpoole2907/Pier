@@ -1,5 +1,8 @@
 import Foundation
 import Observation
+import OSLog
+
+private let logsLogger = Logger(subsystem: "com.poole.james.pier", category: "container.logs")
 
 /// Komodo's `GetContainerLog` has no follow/stream endpoint - it always returns a snapshot of the
 /// last `tail` lines. "Follow" is implemented here as a poll loop (`startFollowing`) that
@@ -13,7 +16,10 @@ final class LogsViewModel {
     private(set) var loadError: KomodoError?
 
     var searchText: String = ""
-    var tailCount: Int = 200
+    var tailCount: Int = 500
+
+    /// Selectable tail sizes offered by the logs "Lines" menu.
+    static let lineOptions = [100, 500, 1000, 5000]
 
     private let client: KomodoClient
     private let serverID: String
@@ -41,24 +47,28 @@ final class LogsViewModel {
 
     /// Loads a single tail snapshot.
     func loadInitial() async {
+        logsLogger.debug("loadInitial: fetching tail=\(self.tailCount) container=\(self.containerID, privacy: .public)")
         do {
             let log = try await client.containerLog(serverID: serverID, containerID: containerID, tail: tailCount)
             self.lines = Self.parseLines(from: log.combined)
             self.loadError = nil
+            logsLogger.debug("loadInitial: got \(self.lines.count) lines (\(log.combined.count) chars) for tail=\(self.tailCount)")
         } catch {
             self.loadError = KomodoError.from(error)
+            logsLogger.error("loadInitial failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
-    /// Loads more lines by increasing tail and reloading.
-    func loadMore() async {
-        tailCount += 200
+    /// Re-fetches the snapshot for the current `tailCount`. Called when the user picks a new line
+    /// count from the "Lines" menu.
+    func reload() async {
         await loadInitial()
     }
 
     /// Starts the poll loop. Idempotent if already following.
     func startFollowing() async {
         guard followTask == nil else { return }
+        logsLogger.debug("startFollowing: polling every \(self.followInterval.components.seconds)s at tail=\(self.tailCount)")
         isFollowing = true
         followTask = Task { [weak self] in
             while let self, !Task.isCancelled {
@@ -81,8 +91,10 @@ final class LogsViewModel {
             let log = try await client.containerLog(serverID: serverID, containerID: containerID, tail: tailCount)
             self.lines = Self.parseLines(from: log.combined)
             self.loadError = nil
+            logsLogger.debug("poll tick: \(self.lines.count) lines at tail=\(self.tailCount)")
         } catch {
             self.loadError = KomodoError.from(error)
+            logsLogger.error("poll tick failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 

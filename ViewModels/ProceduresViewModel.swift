@@ -49,8 +49,11 @@ final class ProceduresViewModel {
             try await client.runProcedure(id: procedure.id)
             loadError = nil
             await load()
+            InAppNotificationCenter.shared.showSuccess(title: "Procedure Complete", message: procedure.name)
         } catch {
-            loadError = KomodoError.from(error)
+            let komodoError = KomodoError.from(error)
+            loadError = komodoError
+            InAppNotificationCenter.shared.reportFailure("Run Procedure", error: komodoError)
         }
     }
 }

@@ -12,6 +12,9 @@ struct ContainersTab: View {
         NavigationStack {
             ContainerListContainer()
                 .navigationTitle("Containers")
+                #if os(iOS)
+                .toolbarTitleDisplayMode(.inlineLarge)
+                #endif
                 .hostTitleMenu()
                 .serverScopeMenu()
                 .navigationDestination(for: ContainerNavigationValue.self) { value in

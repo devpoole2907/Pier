@@ -54,5 +54,6 @@ struct AlertsListView: View {
         #else
         .listStyle(.inset)
         #endif
+        .softScrollEdges()
     }
 }

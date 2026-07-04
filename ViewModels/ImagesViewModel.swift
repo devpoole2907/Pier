@@ -89,8 +89,11 @@ final class ImagesViewModel {
         do {
             try await client.deleteImage(serverID: item.serverID, name: item.image.name)
             await load()
+            InAppNotificationCenter.shared.showSuccess(title: "Image Deleted", message: item.image.displayName)
         } catch {
-            self.loadError = KomodoError.from(error)
+            let komodoError = KomodoError.from(error)
+            self.loadError = komodoError
+            InAppNotificationCenter.shared.reportFailure("Delete Image", error: komodoError)
         }
     }
 
@@ -113,6 +116,10 @@ final class ImagesViewModel {
 
         if let firstError {
             self.loadError = firstError
+            InAppNotificationCenter.shared.reportFailure("Delete Images", error: firstError)
+        } else if !deletedIDs.isEmpty {
+            let message = items.count == 1 ? items[0].image.displayName : "\(deletedIDs.count) images"
+            InAppNotificationCenter.shared.showSuccess(title: "Images Deleted", message: message)
         }
 
         return deletedIDs
@@ -132,8 +139,11 @@ final class ImagesViewModel {
             }
             self.loadError = nil
             await load()
+            InAppNotificationCenter.shared.showSuccess(title: "Images Pruned", message: "Unused images removed")
         } catch {
-            self.loadError = KomodoError.from(error)
+            let komodoError = KomodoError.from(error)
+            self.loadError = komodoError
+            InAppNotificationCenter.shared.reportFailure("Prune Images", error: komodoError)
         }
     }
 }

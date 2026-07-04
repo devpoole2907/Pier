@@ -85,27 +85,50 @@ final class ContainerDetailViewModel {
         }
     }
 
-    func start() async { await performAction { try await self.client.startContainer(serverID: self.serverID, containerID: self.containerID) } }
-    func stop() async { await performAction { try await self.client.stopContainer(serverID: self.serverID, containerID: self.containerID) } }
-    func restart() async { await performAction { try await self.client.restartContainer(serverID: self.serverID, containerID: self.containerID) } }
+    func start() async {
+        await performAction(successTitle: "Container Started", failureAction: "Start Container") {
+            try await self.client.startContainer(serverID: self.serverID, containerID: self.containerID)
+        }
+    }
+    func stop() async {
+        await performAction(successTitle: "Container Stopped", failureAction: "Stop Container") {
+            try await self.client.stopContainer(serverID: self.serverID, containerID: self.containerID)
+        }
+    }
+    func restart() async {
+        await performAction(successTitle: "Container Restarted", failureAction: "Restart Container") {
+            try await self.client.restartContainer(serverID: self.serverID, containerID: self.containerID)
+        }
+    }
     func kill() async {
         // Komodo has no dedicated "kill" call; a SIGKILL stop with no grace period is the
         // equivalent of the old "kill" action.
-        await performAction { try await self.client.stopContainer(serverID: self.serverID, containerID: self.containerID, signal: "SIGKILL", time: 0) }
+        await performAction(successTitle: "Container Killed", failureAction: "Kill Container") {
+            try await self.client.stopContainer(serverID: self.serverID, containerID: self.containerID, signal: "SIGKILL", time: 0)
+        }
     }
     func delete() async {
-        await performAction { try await self.client.destroyContainer(serverID: self.serverID, containerID: self.containerID) }
+        await performAction(successTitle: "Container Deleted", failureAction: "Delete Container") {
+            try await self.client.destroyContainer(serverID: self.serverID, containerID: self.containerID)
+        }
     }
 
-    private func performAction(_ body: @escaping @Sendable () async throws -> Void) async {
+    private func performAction(
+        successTitle: String,
+        failureAction: String,
+        _ body: @escaping @Sendable () async throws -> Void
+    ) async {
         isPerformingAction = true
         defer { isPerformingAction = false }
         do {
             try await body()
             self.actionError = nil
             await load()
+            InAppNotificationCenter.shared.showSuccess(title: successTitle, message: displayName)
         } catch {
-            self.actionError = KomodoError.from(error)
+            let komodoError = KomodoError.from(error)
+            self.actionError = komodoError
+            InAppNotificationCenter.shared.reportFailure(failureAction, error: komodoError)
         }
     }
 

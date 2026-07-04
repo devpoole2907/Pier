@@ -202,8 +202,11 @@ final class ContainerListViewModel {
         do {
             try await body()
             await load(includeStopped: includesStopped)
+            InAppNotificationCenter.shared.showSuccess(title: actionState.successTitle, message: container.displayName)
         } catch {
-            self.loadError = KomodoError.from(error)
+            let komodoError = KomodoError.from(error)
+            self.loadError = komodoError
+            InAppNotificationCenter.shared.reportFailure(actionState.failureActionName, error: komodoError)
         }
     }
 
@@ -225,8 +228,12 @@ final class ContainerListViewModel {
                 try await operation(container)
             }
             await load(includeStopped: includesStopped)
+            let message = containers.count == 1 ? containers[0].displayName : "\(containers.count) containers"
+            InAppNotificationCenter.shared.showSuccess(title: actionState.successTitlePlural, message: message)
         } catch {
-            self.loadError = KomodoError.from(error)
+            let komodoError = KomodoError.from(error)
+            self.loadError = komodoError
+            InAppNotificationCenter.shared.reportFailure(actionState.failureActionName, error: komodoError)
         }
     }
 }
@@ -270,5 +277,35 @@ enum ContainerActionState: String, Sendable {
 
     var rowDetailText: String {
         "\(displayName) request in progress"
+    }
+
+    var successTitle: String {
+        switch self {
+        case .starting: "Container Started"
+        case .stopping: "Container Stopped"
+        case .restarting: "Container Restarted"
+        case .killing: "Container Killed"
+        case .deleting: "Container Deleted"
+        }
+    }
+
+    var successTitlePlural: String {
+        switch self {
+        case .starting: "Containers Started"
+        case .stopping: "Containers Stopped"
+        case .restarting: "Containers Restarted"
+        case .killing: "Containers Killed"
+        case .deleting: "Containers Deleted"
+        }
+    }
+
+    var failureActionName: String {
+        switch self {
+        case .starting: "Start Container"
+        case .stopping: "Stop Container"
+        case .restarting: "Restart Container"
+        case .killing: "Kill Container"
+        case .deleting: "Delete Container"
+        }
     }
 }

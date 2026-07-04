@@ -40,5 +40,6 @@ struct VariablesListView: View {
         #else
         .listStyle(.inset)
         #endif
+        .softScrollEdges()
     }
 }

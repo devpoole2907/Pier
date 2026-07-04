@@ -1,0 +1,413 @@
+import Foundation
+import Observation
+#if os(iOS)
+import UIKit
+#endif
+
+@MainActor
+@Observable
+final class InAppNotificationCenter {
+    static let shared = InAppNotificationCenter()
+
+    private static let persistenceKey = "InAppNotificationCenter.recentNotifications"
+    private static let lastReadKey = "InAppNotificationCenter.lastReadDate"
+
+    private(set) var currentBanner: InAppBannerItem?
+    private(set) var recentNotifications: [NotificationLogEntry] = InAppNotificationCenter.loadPersistedNotifications()
+    private(set) var lastReadDate: Date = InAppNotificationCenter.loadLastReadDate()
+    var isPresentingRecentNotifications = false
+    var currentBannerHasAction: Bool { currentBanner?.action != nil }
+    var unreadCount: Int { recentNotifications.filter { $0.timestamp > lastReadDate }.count }
+
+    // Current banner frame in window coordinates. Used by the iOS passthrough
+    // window's hit test so touches inside the banner reach SwiftUI's gesture
+    // system. ObservationIgnored — read imperatively from UIKit, not via views.
+    @ObservationIgnored var bannerFrame: CGRect = .zero
+
+    private var queuedBanners: [InAppBannerItem] = []
+    private var dismissTask: Task<Void, Never>?
+
+    #if os(iOS)
+    private let notificationGenerator = UINotificationFeedbackGenerator()
+    private let impactGenerator = UIImpactFeedbackGenerator(style: .medium)
+
+    private var hapticsEnabled: Bool {
+        UserDefaults.standard.object(forKey: "hapticsEnabled") as? Bool ?? true
+    }
+    #endif
+
+    func showProgress(title: String, message: String, key: String? = nil, source: NotificationLogEntry.Source = .inApp) {
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedMessage = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty, !trimmedMessage.isEmpty else { return }
+        appendLog(title: trimmedTitle, message: trimmedMessage, style: .progress, source: source)
+
+        presentImmediately(
+            InAppBannerItem(
+                title: trimmedTitle,
+                message: trimmedMessage,
+                systemImage: "arrow.triangle.2.circlepath",
+                style: .progress,
+                action: nil,
+                key: key,
+                showsProgressView: true,
+                automaticallyDismisses: false
+            ),
+            requeueCurrent: true
+        )
+    }
+
+    func showSuccess(title: String, message: String, action: InAppBannerAction? = nil, source: NotificationLogEntry.Source = .inApp) {
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedMessage = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty, !trimmedMessage.isEmpty else { return }
+        appendLog(title: trimmedTitle, message: trimmedMessage, style: .success, source: source)
+
+        #if os(iOS)
+        if hapticsEnabled { notificationGenerator.notificationOccurred(.success) }
+        #endif
+
+        enqueue(InAppBannerItem(
+            title: trimmedTitle,
+            message: trimmedMessage,
+            systemImage: "checkmark.circle.fill",
+            style: .success,
+            action: action,
+            key: nil,
+            showsProgressView: false,
+            automaticallyDismisses: true
+        ))
+    }
+
+    func replaceProgressWithSuccess(
+        key: String,
+        title: String,
+        message: String,
+        action: InAppBannerAction? = nil
+    ) {
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedMessage = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty, !trimmedMessage.isEmpty else { return }
+
+        // Record in recent notifications and update unread count
+        appendLog(title: trimmedTitle, message: trimmedMessage, style: .success, source: .inApp)
+
+        removeQueuedBanner(matching: key)
+        if currentBanner?.key == key {
+            #if os(iOS)
+                if hapticsEnabled { notificationGenerator.notificationOccurred(.success) }
+            #endif
+            presentImmediately(makeBanner(title: trimmedTitle, message: trimmedMessage, style: .success, action: action), requeueCurrent: false)
+            return
+        }
+        // Use updated trimmed values
+        #if os(iOS)
+        if hapticsEnabled { notificationGenerator.notificationOccurred(.success) }
+        #endif
+
+        enqueue(InAppBannerItem(
+            title: trimmedTitle,
+            message: trimmedMessage,
+            systemImage: "checkmark.circle.fill",
+            style: .success,
+            action: action,
+            key: nil,
+            showsProgressView: false,
+            automaticallyDismisses: true
+        ))
+    }
+
+    func showError(title: String, message: String, source: NotificationLogEntry.Source = .inApp) {
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedMessage = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty, !trimmedMessage.isEmpty else { return }
+        appendLog(title: trimmedTitle, message: trimmedMessage, style: .error, source: source)
+
+        #if os(iOS)
+        if hapticsEnabled { notificationGenerator.notificationOccurred(.error) }
+        #endif
+
+        enqueue(InAppBannerItem(
+            title: trimmedTitle,
+            message: trimmedMessage,
+            systemImage: "exclamationmark.triangle.fill",
+            style: .error,
+            action: nil,
+            key: nil,
+            showsProgressView: false,
+            automaticallyDismisses: true
+        ))
+    }
+
+    func replaceProgressWithError(key: String, title: String, message: String) {
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedMessage = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty, !trimmedMessage.isEmpty else { return }
+
+        // Record in recent notifications and update unread count
+        appendLog(title: trimmedTitle, message: trimmedMessage, style: .error, source: .inApp)
+
+        removeQueuedBanner(matching: key)
+        if currentBanner?.key == key {
+            #if os(iOS)
+                if hapticsEnabled { notificationGenerator.notificationOccurred(.error) }
+            #endif
+            presentImmediately(makeBanner(title: trimmedTitle, message: trimmedMessage, style: .error, action: nil), requeueCurrent: false)
+            return
+        }
+        // Use updated trimmed values
+        #if os(iOS)
+        if hapticsEnabled { notificationGenerator.notificationOccurred(.error) }
+        #endif
+
+        enqueue(InAppBannerItem(
+            title: trimmedTitle,
+            message: trimmedMessage,
+            systemImage: "exclamationmark.triangle.fill",
+            style: .error,
+            action: nil,
+            key: nil,
+            showsProgressView: false,
+            automaticallyDismisses: true
+        ))
+    }
+
+    func clearRecentNotifications() {
+        recentNotifications.removeAll()
+        persistNotifications()
+    }
+
+    func removeNotification(id: UUID) {
+        recentNotifications.removeAll { $0.id == id }
+        persistNotifications()
+    }
+
+    func markAllRead() {
+        lastReadDate = Date()
+        UserDefaults.standard.set(lastReadDate.timeIntervalSince1970, forKey: Self.lastReadKey)
+    }
+
+    func dismissBanner(matching key: String) {
+        removeQueuedBanner(matching: key)
+        guard currentBanner?.key == key else { return }
+        dismissCurrentBanner()
+    }
+
+    func triggerImpact() {
+        #if os(iOS)
+        if hapticsEnabled { impactGenerator.impactOccurred() }
+        #endif
+    }
+
+    func reportFailure(_ action: String, error: Error) {
+        showError(title: "\(action) Failed", message: error.localizedDescription)
+    }
+
+    func reportFailure(_ action: String, message: String) {
+        showError(title: "\(action) Failed", message: message)
+    }
+
+    func dismissCurrentBanner() {
+        dismissTask?.cancel()
+        dismissTask = nil
+        currentBanner = nil
+
+        // Brief delay before showing next banner to allow for dismissal animation
+        Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            self.showNext()
+        }
+    }
+
+    func fireCurrentBannerAction() {
+        let action = currentBanner?.action
+        dismissCurrentBanner()
+        action?.handler()
+    }
+
+    func showRecentNotifications() {
+        isPresentingRecentNotifications = true
+    }
+
+    private func enqueue(_ banner: InAppBannerItem) {
+        queuedBanners.append(banner)
+
+        if currentBanner == nil {
+            showNext()
+        }
+    }
+
+    private func removeQueuedBanner(matching key: String) {
+        queuedBanners.removeAll { $0.key == key }
+    }
+
+    private func showNext() {
+        guard currentBanner == nil, !queuedBanners.isEmpty else { return }
+        present(queuedBanners.removeFirst())
+    }
+
+    private func presentImmediately(_ banner: InAppBannerItem, requeueCurrent: Bool) {
+        if let key = banner.key {
+            removeQueuedBanner(matching: key)
+        }
+        dismissTask?.cancel()
+        dismissTask = nil
+
+        if requeueCurrent, let currentBanner {
+            // Only suppress requeue if both keys are non-nil and equal
+            let shouldSuppress = currentBanner.key != nil && banner.key != nil && currentBanner.key == banner.key
+            if !shouldSuppress {
+                queuedBanners.insert(currentBanner, at: 0)
+            }
+        }
+
+        present(banner)
+    }
+
+    private func present(_ banner: InAppBannerItem) {
+        currentBanner = banner
+        dismissTask?.cancel()
+        guard banner.automaticallyDismisses else {
+            dismissTask = nil
+            return
+        }
+        dismissTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(4.5))
+            guard !Task.isCancelled else { return }
+            self?.dismissCurrentBanner()
+        }
+    }
+
+
+    private func makeBanner(title: String, message: String, style: InAppBannerStyle, action: InAppBannerAction?) -> InAppBannerItem {
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedMessage = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        let systemImage: String
+        let dismisses: Bool
+        let showsProgress: Bool
+
+        switch style {
+        case .success:
+            systemImage = "checkmark.circle.fill"
+            dismisses = true
+            showsProgress = false
+        case .error:
+            systemImage = "exclamationmark.triangle.fill"
+            dismisses = true
+            showsProgress = false
+        case .progress:
+            systemImage = "arrow.triangle.2.circlepath"
+            dismisses = false
+            showsProgress = true
+        }
+
+        return InAppBannerItem(
+            title: trimmedTitle,
+            message: trimmedMessage,
+            systemImage: systemImage,
+            style: style,
+            action: action,
+            key: nil,
+            showsProgressView: showsProgress,
+            automaticallyDismisses: dismisses
+        )
+    }
+
+    private func appendLog(title: String, message: String, style: InAppBannerStyle, source: NotificationLogEntry.Source) {
+        let entry = NotificationLogEntry(title: title, message: message, style: style, source: source, timestamp: Date())
+        recentNotifications.insert(entry, at: 0)
+        if recentNotifications.count > 200 {
+            recentNotifications.removeLast(recentNotifications.count - 200)
+        }
+        persistNotifications()
+    }
+
+    private func persistNotifications() {
+        guard let data = try? JSONEncoder().encode(recentNotifications) else { return }
+        UserDefaults.standard.set(data, forKey: Self.persistenceKey)
+    }
+
+    private static func loadPersistedNotifications() -> [NotificationLogEntry] {
+        guard let data = UserDefaults.standard.data(forKey: persistenceKey),
+              let entries = try? JSONDecoder().decode([NotificationLogEntry].self, from: data) else {
+            return []
+        }
+        return entries
+    }
+
+    private static func loadLastReadDate() -> Date {
+        let interval = UserDefaults.standard.double(forKey: lastReadKey)
+        return interval > 0 ? Date(timeIntervalSince1970: interval) : .distantPast
+    }
+}
+
+#if DEBUG
+extension InAppNotificationCenter {
+    convenience init(
+        previewNotifications: [NotificationLogEntry],
+        lastReadDate: Date = .distantPast
+    ) {
+        self.init()
+        dismissTask?.cancel()
+        dismissTask = nil
+        currentBanner = nil
+        queuedBanners = []
+        recentNotifications = previewNotifications
+        self.lastReadDate = lastReadDate
+        isPresentingRecentNotifications = false
+    }
+}
+#endif
+
+struct InAppBannerAction {
+    let label: String
+    let handler: () -> Void
+}
+
+enum InAppBannerStyle: String, Codable, Sendable {
+    case success
+    case error
+    case progress
+}
+
+struct InAppBannerItem: Identifiable, @unchecked Sendable {
+    let id = UUID()
+    let title: String
+    let message: String
+    let systemImage: String
+    let style: InAppBannerStyle
+    let action: InAppBannerAction?
+    let key: String?
+    let showsProgressView: Bool
+    let automaticallyDismisses: Bool
+}
+
+struct NotificationLogEntry: Identifiable, Codable, Sendable {
+    enum Source: String, Codable, Sendable {
+        case inApp = "In-App"
+        case system = "System"
+    }
+
+    let id: UUID
+    let title: String
+    let message: String
+    let style: InAppBannerStyle
+    let source: Source
+    let timestamp: Date
+
+    init(title: String, message: String, style: InAppBannerStyle, source: Source, timestamp: Date) {
+        self.id = UUID()
+        self.title = title
+        self.message = message
+        self.style = style
+        self.source = source
+        self.timestamp = timestamp
+    }
+}
+
+extension InAppBannerItem: Equatable {
+    static func == (lhs: InAppBannerItem, rhs: InAppBannerItem) -> Bool {
+        lhs.id == rhs.id
+    }
+}
