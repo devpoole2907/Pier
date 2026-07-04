@@ -3,9 +3,10 @@ import SwiftUI
 /// Lets the user pick a specific Komodo resource (of the given `kind`) from the live lists
 /// fetched for the active host, then adds it as a saved terminal target on the Terminals tab.
 ///
-/// Reached from the "+" menu: the user picks a resource here, taps "Add", and it's pinned to the
-/// Terminals list (tapping it there opens the live terminal). Select-then-confirm rather than
-/// tap-to-commit since the picker shows the full live inventory.
+/// Reached from the "+" menu: the user picks a resource here, optionally a stack service / mode /
+/// terminal name, taps "Add", and it's pinned to the Terminals list (tapping it there opens the
+/// live terminal). Select-then-confirm rather than tap-to-commit since the picker shows the full
+/// live inventory.
 struct KomodoTerminalConfigSheet: View {
     let kind: KomodoTerminalTarget.Kind
     let servers: [KomodoServer]
@@ -14,42 +15,64 @@ struct KomodoTerminalConfigSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var selectedID: String?
+    @State private var selectedService: String?
+    @State private var mode: KomodoTerminalTarget.Mode = .exec
+    @State private var terminalName: String = ""
 
     var body: some View {
         NavigationStack {
-            Group {
-                if candidates.isEmpty {
-                    EmptyStateView(
-                        title: "No \(kind.pluralLabel)",
-                        systemImage: kind.systemImage,
-                        message: "No \(kind.label.lowercased())s were found on the active Komodo host."
-                    )
-                } else {
-                    List(candidates) { candidate in
-                        Button {
-                            selectedID = candidate.id
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(candidate.name)
-                                        .font(.body.weight(.semibold))
-                                        .foregroundStyle(.primary)
-                                    Text(candidate.subtitle)
-                                        .font(.footnote)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                if selectedID == candidate.id {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(DesignSystem.Colors.accent)
-                                }
+            Form {
+                Section("Choose a \(kind.label)") {
+                    if candidates.isEmpty {
+                        Text("No \(kind.label.lowercased())s were found on the active Komodo host.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        // A navigation-link picker keeps the form compact so Service / Mode /
+                        // Terminal name below stay on-screen instead of being pushed off by a long
+                        // inventory list.
+                        Picker(kind.label, selection: $selectedID) {
+                            Text("Select…").tag(String?.none)
+                            ForEach(candidates) { candidate in
+                                Text(candidate.name).tag(Optional(candidate.id))
                             }
-                            .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
+                        .pickerStyle(.navigationLink)
                     }
                 }
+
+                if kind == .stack, let stack = selectedStack {
+                    Section("Service") {
+                        Picker("Service", selection: Binding(
+                            get: { selectedService ?? stack.services.first?.service ?? "" },
+                            set: { selectedService = $0 }
+                        )) {
+                            ForEach(stack.services) { service in
+                                Text(service.service).tag(service.service)
+                            }
+                        }
+                    }
+                }
+
+                if kind != .server {
+                    Section("Mode") {
+                        Picker("Mode", selection: $mode) {
+                            ForEach(KomodoTerminalTarget.Mode.allCases) { mode in
+                                Text(mode.label).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                }
+
+                Section("Terminal name") {
+                    TextField("pier (optional)", text: $terminalName)
+                        #if os(iOS)
+                        .autocapitalization(.none)
+                        #endif
+                        .disableAutocorrection(true)
+                }
             }
+            .onChange(of: selectedID) { selectedService = nil }
             .navigationTitle("Choose \(kind.label)")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -60,10 +83,10 @@ struct KomodoTerminalConfigSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add") {
-                        guard let target = selectedTarget else { return }
+                        guard let target = finalTarget else { return }
                         onAdd(target)
                     }
-                    .disabled(selectedTarget == nil)
+                    .disabled(!canAdd)
                 }
             }
         }
@@ -109,6 +132,32 @@ struct KomodoTerminalConfigSheet: View {
 
     private var selectedTarget: KomodoTerminalTarget? {
         candidates.first { $0.id == selectedID }
+    }
+
+    private var selectedStack: Stack? {
+        guard let selectedTarget else { return nil }
+        return resources.stacks.first { $0.id == selectedTarget.resourceID }
+    }
+
+    private var canAdd: Bool {
+        guard selectedTarget != nil else { return false }
+        if kind == .stack {
+            return !(selectedService ?? selectedStack?.services.first?.service ?? "").isEmpty
+        }
+        return true
+    }
+
+    private var finalTarget: KomodoTerminalTarget? {
+        guard var target = selectedTarget else { return nil }
+        if kind == .stack {
+            target.serviceName = selectedService ?? selectedStack?.services.first?.service
+        }
+        if kind != .server {
+            target.mode = mode
+        }
+        let trimmedName = terminalName.trimmingCharacters(in: .whitespaces)
+        target.terminalName = trimmedName.isEmpty ? nil : trimmedName
+        return target
     }
 
     private func serverName(for serverID: String) -> String {

@@ -48,6 +48,7 @@ final class NPMHostManager {
             activeNPMHostID = nil
             UserDefaults.standard.removeObject(forKey: activeHostKey)
         }
+        InAppNotificationCenter.shared.showSuccess(title: "Host Removed", message: host.name)
     }
 
     func authenticate(host: NPMHost, secret: String) async throws {
@@ -73,6 +74,20 @@ final class NPMHostManager {
             self.lastError = npmError
             npmHostsLogger.error("Failed to verify NPM host \(host.id.uuidString, privacy: .private(mask: .hash)): \(error.localizedDescription, privacy: .private)")
         }
+    }
+
+    /// Clears a stored active-host id that no longer maps to an existing `NPMHost` (the host was
+    /// deleted, or the store was reset while `UserDefaults` kept the id). Without this, a stale id
+    /// stays non-nil and surfaces "The active NPM host could not be found" instead of the
+    /// not-configured state. Idempotent; safe to call on every appearance.
+    func reconcileActiveHost(in context: ModelContext) {
+        guard let activeNPMHostID else { return }
+        let descriptor = FetchDescriptor<NPMHost>(predicate: #Predicate { $0.id == activeNPMHostID })
+        let exists = ((try? context.fetch(descriptor).first) ?? nil) != nil
+        guard !exists else { return }
+        npmHostsLogger.info("Cleared stale active NPM host id (no matching host in store)")
+        self.activeNPMHostID = nil
+        UserDefaults.standard.removeObject(forKey: activeHostKey)
     }
 
     func resolveActiveClient(in context: ModelContext) throws -> (host: NPMHost, client: NPMClient)? {

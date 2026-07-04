@@ -39,6 +39,22 @@ struct KomodoTerminalTarget: Identifiable, Hashable {
         }
     }
 
+    /// Whether a container-like terminal execs a fresh shell or attaches to the container's
+    /// existing entrypoint process. Not meaningful for `.server` targets.
+    enum Mode: String, CaseIterable, Identifiable {
+        case exec
+        case attach
+
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .exec: "Exec"
+            case .attach: "Attach"
+            }
+        }
+    }
+
     let kind: Kind
     let resourceID: String
     let name: String
@@ -52,6 +68,13 @@ struct KomodoTerminalTarget: Identifiable, Hashable {
     /// The compose service to attach to for a Stack target's `target[params][service]`.
     /// Typically the stack's first service; empty if the stack has none.
     var serviceName: String? = nil
+
+    /// Exec vs attach, for `.container`/`.stack`/`.deployment` targets.
+    var mode: Mode = .exec
+
+    /// Optional user-chosen name for the `terminal=` query param; falls back to a hardcoded
+    /// default (`"pier"`) when nil/empty.
+    var terminalName: String? = nil
 
     var id: String { "\(kind.rawValue):\(resourceID)" }
 }

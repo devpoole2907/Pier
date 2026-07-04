@@ -50,70 +50,80 @@ struct ProxyTab: View {
         @Bindable var npmHostManager = npmHostManager
 
         NavigationStack(path: $path) {
-            List {
-                Section {
-                    NavigationLink(value: ProxyDestination.proxyHosts) {
-                        proxyRow(
-                            accent: .proxy,
-                            title: "Proxy Hosts",
-                            subtitle: "Manage reverse-proxy entries and SSL"
-                        )
-                    }
-                }
+            Group {
+                if !activeHostExists {
+                    NoProxyConfiguredView()
+                } else {
+                    List {
+                        Section {
+                            NavigationLink(value: ProxyDestination.proxyHosts) {
+                                proxyRow(
+                                    accent: .proxy,
+                                    title: "Proxy Hosts",
+                                    subtitle: "Manage reverse-proxy entries and SSL"
+                                )
+                            }
+                        }
 
-                Section {
-                    NavigationLink(value: ProxyDestination.redirectionHosts) {
-                        proxyRow(
-                            accent: .redirection,
-                            title: "Redirection Hosts",
-                            subtitle: "HTTP redirect rules for domains"
-                        )
-                    }
+                        Section {
+                            NavigationLink(value: ProxyDestination.redirectionHosts) {
+                                proxyRow(
+                                    accent: .redirection,
+                                    title: "Redirection Hosts",
+                                    subtitle: "HTTP redirect rules for domains"
+                                )
+                            }
 
-                    NavigationLink(value: ProxyDestination.deadHosts) {
-                        proxyRow(
-                            accent: .dead,
-                            title: "404 Hosts",
-                            subtitle: "Custom 404 pages for unknown hosts"
-                        )
-                    }
+                            NavigationLink(value: ProxyDestination.deadHosts) {
+                                proxyRow(
+                                    accent: .dead,
+                                    title: "404 Hosts",
+                                    subtitle: "Custom 404 pages for unknown hosts"
+                                )
+                            }
 
-                    NavigationLink(value: ProxyDestination.streams) {
-                        proxyRow(
-                            accent: .stream,
-                            title: "Streams",
-                            subtitle: "TCP/UDP port forwarding"
-                        )
-                    }
-                }
+                            NavigationLink(value: ProxyDestination.streams) {
+                                proxyRow(
+                                    accent: .stream,
+                                    title: "Streams",
+                                    subtitle: "TCP/UDP port forwarding"
+                                )
+                            }
+                        }
 
-                Section {
-                    NavigationLink(value: ProxyDestination.accessLists) {
-                        proxyRow(
-                            accent: .accessList,
-                            title: "Access Lists",
-                            subtitle: "Basic auth and IP allow/deny rules"
-                        )
-                    }
+                        Section {
+                            NavigationLink(value: ProxyDestination.accessLists) {
+                                proxyRow(
+                                    accent: .accessList,
+                                    title: "Access Lists",
+                                    subtitle: "Basic auth and IP allow/deny rules"
+                                )
+                            }
 
-                    NavigationLink(value: ProxyDestination.certificates) {
-                        proxyRow(
-                            accent: .certificate,
-                            title: "Certificates",
-                            subtitle: "Let's Encrypt and custom SSL certs"
-                        )
+                            NavigationLink(value: ProxyDestination.certificates) {
+                                proxyRow(
+                                    accent: .certificate,
+                                    title: "Certificates",
+                                    subtitle: "Let's Encrypt and custom SSL certs"
+                                )
+                            }
+                        }
                     }
+                    #if os(iOS)
+                    .listStyle(.insetGrouped)
+                    .toolbarTitleDisplayMode(.inlineLarge)
+                    #else
+                    .listStyle(.inset)
+                    #endif
+                    .softScrollEdges()
                 }
             }
-            #if os(iOS)
-            .listStyle(.insetGrouped)
-            .toolbarTitleDisplayMode(.large)
-            #else
-            .listStyle(.inset)
-            #endif
             .navigationTitle("Proxy")
             .npmHostTitleMenu()
             .toolbar { npmToolbar }
+            .task(id: npmHostManager.activeNPMHostID) {
+                npmHostManager.reconcileActiveHost(in: modelContext)
+            }
             .navigationDestination(for: ProxyDestination.self) { destination in
                 switch destination {
                 case .proxyHosts:
@@ -159,6 +169,15 @@ struct ProxyTab: View {
             }
             .labelStyle(.iconOnly)
         }
+    }
+
+    /// Whether the stored active NPM host actually exists in the store. Gating on this (rather than
+    /// just `activeNPMHostID != nil`) means a stale id shows the not-configured CTA immediately,
+    /// without a flash of the "could not be found" error before `reconcileActiveHost` runs.
+    private var activeHostExists: Bool {
+        guard let id = npmHostManager.activeNPMHostID else { return false }
+        let descriptor = FetchDescriptor<NPMHost>(predicate: #Predicate { $0.id == id })
+        return (((try? modelContext.fetch(descriptor).first) ?? nil) != nil)
     }
 
     private func proxyRow(accent: ProxyDestinationAccent, title: String, subtitle: String) -> some View {

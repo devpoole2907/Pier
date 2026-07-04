@@ -284,7 +284,11 @@ final class KomodoTerminalConnection {
         case .server:
             pairs = [
                 ("target[type]", "Server"),
-                ("target[params][server]", target.resourceID)
+                ("target[params][server]", target.resourceID),
+                // Any one init[...] key makes Core deserialize `init` as `Some(...)`, which is what
+                // actually triggers Core to ask Periphery to spawn the shell for this named terminal.
+                // Leaving `command` unset lets Periphery fall back to its own configured default shell.
+                ("init[recreate]", "Never")
             ]
         case .container:
             guard let serverID = target.serverID, !serverID.isEmpty else {
@@ -295,27 +299,47 @@ final class KomodoTerminalConnection {
             pairs = [
                 ("target[type]", "Container"),
                 ("target[params][server]", serverID),
-                ("target[params][container]", target.name),
-                ("init[command]", "sh"),
-                ("init[mode]", "exec")
+                ("target[params][container]", target.name)
             ]
+            pairs.append(contentsOf: initPairs(for: target.mode))
         case .stack:
+            guard let serviceName = target.serviceName, !serviceName.isEmpty else {
+                throw KomodoTerminalConnectionError.missingContext(
+                    "This stack target needs a service selected before it can be opened."
+                )
+            }
             pairs = [
                 ("target[type]", "Stack"),
                 ("target[params][stack]", target.resourceID),
-                ("target[params][service]", target.serviceName ?? "")
+                ("target[params][service]", serviceName)
             ]
+            pairs.append(contentsOf: initPairs(for: target.mode))
         case .deployment:
             pairs = [
                 ("target[type]", "Deployment"),
                 ("target[params][deployment]", target.resourceID)
             ]
+            pairs.append(contentsOf: initPairs(for: target.mode))
         }
-        pairs.append(("terminal", "pier"))
+        let name = target.terminalName?.trimmingCharacters(in: .whitespaces)
+        pairs.append(("terminal", (name?.isEmpty == false ? name! : "pier")))
 
         return pairs.map { key, value in
             let encodedValue = value.addingPercentEncoding(withAllowedCharacters: unreservedValueCharacters) ?? value
             return "\(key)=\(encodedValue)"
         }.joined(separator: "&")
+    }
+
+    /// `init[...]` pairs for container-like targets (Container/Stack/Deployment all funnel through the
+    /// same Periphery "container exec/attach terminal" creation path). Exec mode passes a shell command;
+    /// attach mode omits it (Komodo's own web UI hides the command field in attach mode — attach just
+    /// connects to the container's existing entrypoint process).
+    private static func initPairs(for mode: KomodoTerminalTarget.Mode) -> [(String, String)] {
+        switch mode {
+        case .exec:
+            return [("init[command]", "sh"), ("init[mode]", "exec")]
+        case .attach:
+            return [("init[mode]", "attach")]
+        }
     }
 }

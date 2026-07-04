@@ -45,7 +45,7 @@ struct WelcomeFlowView: View {
                     description: "Connect to your Docker control plane"
                 )
                 WelcomeFeatureRow(
-                    icon: AppDestination.containers.systemImage,
+                    icon: "shippingbox.fill",
                     color: PierServiceIdentity.komodo.brandColor,
                     title: "Containers",
                     description: "Start, stop, inspect, and monitor containers"

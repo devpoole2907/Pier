@@ -219,18 +219,22 @@ struct NPMHostEditorView: View {
             _ = try await client.ping()
             connectionTest = .success
             npmEditorLogger.info("NPM connection test succeeded")
+            InAppNotificationCenter.shared.showSuccess(title: "Connection Verified", message: candidate.name)
         } catch let error as NPMError {
             connectionTest = .failure(error.errorDescription ?? "Connection failed")
             npmEditorLogger.error("NPM connection test failed: \(error.localizedDescription, privacy: .private)")
+            InAppNotificationCenter.shared.reportFailure("Verify Host", error: error)
         } catch {
             connectionTest = .failure(error.localizedDescription)
             npmEditorLogger.error("NPM connection test failed: \(error.localizedDescription, privacy: .private)")
+            InAppNotificationCenter.shared.reportFailure("Verify Host", error: error)
         }
     }
 
     private func save() async {
         npmEditorLogger.info("Saving NPM host configuration")
         do {
+            let isNewHost = existingHost == nil
             let host: NPMHost
             if let existing = existingHost {
                 existing.name = name
@@ -258,13 +262,16 @@ struct NPMHostEditorView: View {
             }
             await npmHostManager.setActive(host)
             npmEditorLogger.info("Saved NPM host configuration")
+            InAppNotificationCenter.shared.showSuccess(title: isNewHost ? "Host Added" : "Host Saved", message: host.name)
             dismiss()
         } catch let error as NPMError {
             connectionTest = .failure(error.errorDescription ?? "Save failed")
             npmEditorLogger.error("Failed to save NPM host: \(error.localizedDescription, privacy: .private)")
+            InAppNotificationCenter.shared.reportFailure("Save Host", error: error)
         } catch {
             connectionTest = .failure(error.localizedDescription)
             npmEditorLogger.error("Failed to save NPM host: \(error.localizedDescription, privacy: .private)")
+            InAppNotificationCenter.shared.reportFailure("Save Host", error: error)
         }
     }
 }

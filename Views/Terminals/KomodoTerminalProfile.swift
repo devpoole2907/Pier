@@ -20,6 +20,10 @@ final class KomodoTerminalProfile {
     var subtitle: String
     var serverID: String?
     var serviceName: String?
+    /// Raw value of `KomodoTerminalTarget.Mode`. Defaulted so existing SwiftData rows
+    /// lightweight-migrate cleanly.
+    var modeRaw: String = KomodoTerminalTarget.Mode.exec.rawValue
+    var terminalName: String?
     var createdAt: Date
 
     init(hostID: UUID, target: KomodoTerminalTarget) {
@@ -31,6 +35,8 @@ final class KomodoTerminalProfile {
         self.subtitle = target.subtitle
         self.serverID = target.serverID
         self.serviceName = target.serviceName
+        self.modeRaw = target.mode.rawValue
+        self.terminalName = target.terminalName
         self.createdAt = .now
     }
 
@@ -46,7 +52,9 @@ final class KomodoTerminalProfile {
             name: name,
             subtitle: subtitle,
             serverID: serverID,
-            serviceName: serviceName
+            serviceName: serviceName,
+            mode: KomodoTerminalTarget.Mode(rawValue: modeRaw) ?? .exec,
+            terminalName: terminalName
         )
     }
 }
