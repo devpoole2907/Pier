@@ -76,6 +76,17 @@ nonisolated struct WriteStackFileBody: Encodable, Sendable {
     let contents: String
 }
 
+nonisolated struct UpdateStackBody: Encodable, Sendable {
+    let id: String
+    let config: PartialStackConfigBody
+}
+
+nonisolated struct PartialStackConfigBody: Encodable, Sendable {
+    let poll_for_updates: Bool?
+    let auto_update: Bool?
+    let auto_update_all_services: Bool?
+}
+
 /// Covers every stack lifecycle route (`DeployStack`, `DeployStackIfChanged`, `PullStack`,
 /// `StartStack`, `StopStack`, `RestartStack`, `PauseStack`, `UnpauseStack`, `DestroyStack`).
 /// Each route's real schema is a subset of these fields; unused fields are simply left `nil`

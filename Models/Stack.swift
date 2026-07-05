@@ -12,6 +12,7 @@ nonisolated struct Stack: Identifiable, Sendable, Hashable {
     let services: [StackServiceInfo]
     let filesOnHost: Bool
     let tags: [String]
+    let updatePolicy: StackUpdatePolicy
 
     /// True if any service in the stack has an update available.
     var updateAvailable: Bool {
@@ -28,6 +29,13 @@ nonisolated struct Stack: Identifiable, Sendable, Hashable {
         case name
         case tags
         case info
+        case config
+    }
+
+    private enum ConfigKeys: String, CodingKey {
+        case pollForUpdates = "poll_for_updates"
+        case autoUpdate = "auto_update"
+        case autoUpdateAllServices = "auto_update_all_services"
     }
 
     private enum InfoKeys: String, CodingKey {
@@ -53,7 +61,29 @@ extension Stack: Decodable {
         self.state = StackState(rawState: rawState)
         self.statusText = try info.decodeIfPresent(String.self, forKey: .status) ?? ""
         self.services = try info.decodeIfPresent([StackServiceInfo].self, forKey: .services) ?? []
+
+        if let config = try? container.nestedContainer(keyedBy: ConfigKeys.self, forKey: .config) {
+            self.updatePolicy = StackUpdatePolicy(
+                pollForUpdates: try config.decodeIfPresent(Bool.self, forKey: .pollForUpdates) ?? false,
+                autoUpdate: try config.decodeIfPresent(Bool.self, forKey: .autoUpdate) ?? false,
+                autoUpdateAllServices: try config.decodeIfPresent(Bool.self, forKey: .autoUpdateAllServices) ?? false
+            )
+        } else {
+            self.updatePolicy = .disabled
+        }
     }
+}
+
+nonisolated struct StackUpdatePolicy: Sendable, Hashable {
+    let pollForUpdates: Bool
+    let autoUpdate: Bool
+    let autoUpdateAllServices: Bool
+
+    static let disabled = StackUpdatePolicy(
+        pollForUpdates: false,
+        autoUpdate: false,
+        autoUpdateAllServices: false
+    )
 }
 
 /// Per-service summary embedded in a `Stack` list item (`info.services`).

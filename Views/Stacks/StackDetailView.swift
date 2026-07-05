@@ -37,6 +37,48 @@ struct StackDetailView: View {
                 }
             }
 
+            Section("Updates") {
+                updateToggle(
+                    title: "Poll for Updates",
+                    subtitle: "Check for updates to the image during Global Auto Update.",
+                    systemImage: "arrow.triangle.2.circlepath",
+                    isOn: policyBinding(\.pollForUpdates) { current, value in
+                        StackUpdatePolicy(
+                            pollForUpdates: value,
+                            autoUpdate: current.autoUpdate,
+                            autoUpdateAllServices: current.autoUpdateAllServices
+                        )
+                    }
+                )
+
+                updateToggle(
+                    title: "Auto Update",
+                    subtitle: "Trigger a redeploy if a newer image is found.",
+                    systemImage: "bolt.badge.automatic",
+                    isOn: policyBinding(\.autoUpdate) { current, value in
+                        StackUpdatePolicy(
+                            pollForUpdates: value ? true : current.pollForUpdates,
+                            autoUpdate: value,
+                            autoUpdateAllServices: current.autoUpdateAllServices
+                        )
+                    }
+                )
+
+                updateToggle(
+                    title: "Full Stack Auto Update",
+                    subtitle: "Always redeploy full stack instead of just specific services with update.",
+                    systemImage: "square.stack.3d.up.fill",
+                    isOn: policyBinding(\.autoUpdateAllServices) { current, value in
+                        StackUpdatePolicy(
+                            pollForUpdates: current.pollForUpdates,
+                            autoUpdate: current.autoUpdate,
+                            autoUpdateAllServices: value
+                        )
+                    }
+                )
+                .disabled(!currentUpdatePolicy.autoUpdate)
+            }
+
             StackServicesSection(stack: stack, viewModel: containerListVM)
 
             Section("Compose file") {
@@ -56,8 +98,8 @@ struct StackDetailView: View {
         .toolbar { toolbarContent }
         .task {
             async let containers: Void = containerListVM.load()
-            async let file: Void = viewModel.loadFile(for: stack)
-            _ = await (containers, file)
+            async let detail: Void = viewModel.loadDetail(for: stack)
+            _ = await (containers, detail)
         }
         .sheet(isPresented: $isShowingEditor) {
             NavigationStack {
@@ -99,6 +141,44 @@ struct StackDetailView: View {
             return path
         }
         return ""
+    }
+
+    private var currentUpdatePolicy: StackUpdatePolicy {
+        viewModel.detail?.updatePolicy ?? stack.updatePolicy
+    }
+
+    private func policyBinding(
+        _ keyPath: KeyPath<StackUpdatePolicy, Bool>,
+        update: @escaping (StackUpdatePolicy, Bool) -> StackUpdatePolicy
+    ) -> Binding<Bool> {
+        Binding(
+            get: { currentUpdatePolicy[keyPath: keyPath] },
+            set: { newValue in
+                let nextPolicy = update(currentUpdatePolicy, newValue)
+                Task { await viewModel.updatePolicy(nextPolicy, for: stack) }
+            }
+        )
+    }
+
+    private func updateToggle(
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        isOn: Binding<Bool>
+    ) -> some View {
+        Toggle(isOn: isOn) {
+            Label {
+                VStack(alignment: .leading, spacing: DesignSystem.Spacing.tight) {
+                    Text(title)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } icon: {
+                Image(systemName: systemImage)
+            }
+        }
+        .disabled(viewModel.isLoadingFile)
     }
 
     @ToolbarContentBuilder

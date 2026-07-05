@@ -8,6 +8,9 @@ final class StacksViewModel {
     private(set) var isLoading = false
     private(set) var loadError: KomodoError?
 
+    /// The stack detail, loaded on demand for detail/edit screens.
+    private(set) var detail: StackDetail?
+
     /// The stack's compose file, loaded on demand for the editor. `nil` once loaded means the
     /// stack has `files_on_host` set but Komodo couldn't return readable contents for it.
     private(set) var file: StackFileContent?
@@ -42,14 +45,16 @@ final class StacksViewModel {
     }
 
     func loadFile(for stack: Stack) async {
+        await loadDetail(for: stack)
+    }
+
+    func loadDetail(for stack: Stack) async {
         isLoadingFile = true
         defer { isLoadingFile = false }
         do {
-            if let result = try await client.stackFile(stackID: stack.id) {
-                self.file = StackFileContent(path: result.path, contents: result.contents)
-            } else {
-                self.file = nil
-            }
+            let detail = try await client.getStack(id: stack.id)
+            self.detail = detail
+            self.file = detail.primaryFile
             self.loadError = nil
         } catch {
             self.loadError = KomodoError.from(error)
@@ -100,6 +105,19 @@ final class StacksViewModel {
     func pull(_ stack: Stack) async {
         await performAction(for: stack, actionState: .pulling) {
             try await self.client.pullStack(stackID: stack.id)
+        }
+    }
+
+    func updatePolicy(_ policy: StackUpdatePolicy, for stack: Stack) async {
+        do {
+            _ = try await client.updateStackUpdatePolicy(stackID: stack.id, policy: policy)
+            await loadDetail(for: stack)
+            await load()
+            InAppNotificationCenter.shared.showSuccess(title: "Stack Settings Saved", message: stack.name)
+        } catch {
+            let komodoError = KomodoError.from(error)
+            self.loadError = komodoError
+            InAppNotificationCenter.shared.reportFailure("Save Stack Settings", error: komodoError)
         }
     }
 

@@ -186,6 +186,20 @@ actor KomodoClient {
         )
     }
 
+    func updateStackUpdatePolicy(stackID: String, policy: StackUpdatePolicy) async throws -> Stack {
+        try await call(
+            "/write/UpdateStack",
+            UpdateStackBody(
+                id: stackID,
+                config: PartialStackConfigBody(
+                    poll_for_updates: policy.pollForUpdates,
+                    auto_update: policy.autoUpdate,
+                    auto_update_all_services: policy.autoUpdateAllServices
+                )
+            )
+        )
+    }
+
     func listStackServices(stackID: String) async throws -> [StackService] {
         try await call("/read/ListStackServices", StackIDBody(stack: stackID))
     }

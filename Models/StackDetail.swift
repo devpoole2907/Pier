@@ -11,6 +11,7 @@ nonisolated struct StackDetail: Identifiable, Sendable {
     let files: [StackFileContent]
     let deployedServices: [String]
     let latestServices: [String]
+    let updatePolicy: StackUpdatePolicy
 
     /// The compose file to show in the editor. Usually there is exactly one.
     var primaryFile: StackFileContent? { files.first }
@@ -28,6 +29,9 @@ nonisolated struct StackDetail: Identifiable, Sendable {
 
     private enum ConfigKeys: String, CodingKey {
         case serverID = "server_id"
+        case pollForUpdates = "poll_for_updates"
+        case autoUpdate = "auto_update"
+        case autoUpdateAllServices = "auto_update_all_services"
     }
 
     private enum InfoKeys: String, CodingKey {
@@ -54,8 +58,14 @@ extension StackDetail: Decodable {
 
         if let config = try? container.nestedContainer(keyedBy: ConfigKeys.self, forKey: .config) {
             self.serverID = try config.decodeIfPresent(String.self, forKey: .serverID) ?? ""
+            self.updatePolicy = StackUpdatePolicy(
+                pollForUpdates: try config.decodeIfPresent(Bool.self, forKey: .pollForUpdates) ?? false,
+                autoUpdate: try config.decodeIfPresent(Bool.self, forKey: .autoUpdate) ?? false,
+                autoUpdateAllServices: try config.decodeIfPresent(Bool.self, forKey: .autoUpdateAllServices) ?? false
+            )
         } else {
             self.serverID = ""
+            self.updatePolicy = .disabled
         }
 
         let info = try container.nestedContainer(keyedBy: InfoKeys.self, forKey: .info)
