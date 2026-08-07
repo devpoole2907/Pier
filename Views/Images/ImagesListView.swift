@@ -58,7 +58,7 @@ struct ImagesListView: View {
             }
         }
         .environment(\.editMode, $editMode)
-        .searchable(text: $viewModel.searchText, prompt: "Search images")
+        .searchable(text: $viewModel.searchText, placement: .alwaysVisible, prompt: "Search images")
         .refreshable { await viewModel.load() }
         .toolbar { imagesToolbar }
         .navigationSubtitle(navigationSubtitleText)

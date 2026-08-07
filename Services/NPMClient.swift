@@ -2,23 +2,20 @@
 @preconcurrency import OSLog
 
 /// All network access for a single Nginx Proxy Manager host. Each host gets its own actor instance,
-/// so JWT/api-token state and the URLSession are isolated per-host.
+/// so JWT state and the URLSession are isolated per-host.
 actor NPMClient {
     nonisolated private static let logger = Logger(subsystem: "com.poole.james.pier", category: "npm.networking")
 
     let hostID: UUID
     private let baseURL: URL
-    private let authMethod: NPMAuthMethod
     private let identity: String
     private var jwt: String?
     private let session: URLSession
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
 
-    /// In password mode, the cached password is used for silent JWT refresh on 401.
+    /// The cached password is used for silent JWT refresh on 401.
     private var cachedPassword: String?
-    /// In token mode, the API token is stored directly as the JWT bearer value.
-    private var tokenMode: Bool { authMethod == .token }
 
     init(host: NPMHost, secret: String? = nil, allowsInsecureTLS: Bool = false) throws {
         let trimmedBaseURL = host.baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -28,15 +25,9 @@ actor NPMClient {
         let url = Self.sanitizedBaseURL(from: rawURL)
         self.hostID = host.id
         self.baseURL = url
-        self.authMethod = host.authMethod
         self.identity = host.identity
-
-        if host.authMethod == .token {
-            self.jwt = secret ?? (try? KeychainService.npmAPIToken(for: host.id))
-        } else {
-            self.cachedPassword = secret ?? (try? KeychainService.npmPassword(for: host.id))
-            self.jwt = try? KeychainService.npmJWT(for: host.id)
-        }
+        self.cachedPassword = secret ?? (try? KeychainService.npmPassword(for: host.id))
+        self.jwt = try? KeychainService.npmJWT(for: host.id)
 
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
@@ -58,11 +49,7 @@ actor NPMClient {
     // MARK: - Auth
 
     func authenticate(secret: String) async throws {
-        if authMethod == .token {
-            try await authenticateWithToken(secret)
-        } else {
-            try await authenticateWithPassword(secret)
-        }
+        try await authenticateWithPassword(secret)
     }
 
     private func authenticateWithPassword(_ password: String) async throws {
@@ -91,14 +78,6 @@ actor NPMClient {
         } catch let error as DecodingError {
             throw NPMError.decoding(String(describing: error))
         }
-    }
-
-    private func authenticateWithToken(_ token: String) async throws {
-        self.jwt = token
-        try KeychainService.storeNPMAPIToken(token: token, for: hostID)
-        // Validate the token with a ping
-        _ = try await ping()
-        Self.logger.info("Stored NPM API token for host \(self.hostID.uuidString, privacy: .private(mask: .hash))")
     }
 
     /// Lightweight connection test.
@@ -395,10 +374,6 @@ actor NPMClient {
         let (data, response) = try await performRequest(request, retryTransient: idempotent)
         guard let http = response as? HTTPURLResponse, http.statusCode == 401 else {
             return (data, response)
-        }
-
-        if tokenMode {
-            throw NPMError.unauthorized
         }
 
         guard let password = cachedPassword else {

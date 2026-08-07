@@ -32,7 +32,7 @@ struct CertificateListView: View {
             }
         }
         .navigationTitle("Certificates")
-        .searchable(text: $viewModel.searchText, prompt: "Search certificates")
+        .searchable(text: $viewModel.searchText, placement: .alwaysVisible, prompt: "Search certificates")
         .refreshable { await viewModel.load() }
         .toolbar {
             ToolbarItem(placement: .platformTrailing) {

@@ -11,7 +11,6 @@ struct NPMHostEditorView: View {
 
     @State private var name: String
     @State private var baseURL: String
-    @State private var authMethod: NPMAuthMethod
     @State private var identity: String
     @State private var secret: String = ""
     @State private var allowsInsecureTLS: Bool
@@ -25,7 +24,6 @@ struct NPMHostEditorView: View {
         self.existingHost = host
         _name = State(initialValue: host?.name ?? "")
         _baseURL = State(initialValue: host?.baseURL ?? "http://")
-        _authMethod = State(initialValue: host?.authMethod ?? .password)
         _identity = State(initialValue: host?.identity ?? "")
         _allowsInsecureTLS = State(initialValue: host?.allowsInsecureTLS ?? false)
     }
@@ -63,11 +61,7 @@ struct NPMHostEditorView: View {
                     .submitLabel(.next)
                     #endif
                     .onSubmit {
-                        if authMethod == .password {
-                            focusedField = .identity
-                        } else {
-                            focusedField = .secret
-                        }
+                        focusedField = .identity
                     }
                     .onChange(of: baseURL) { _, newValue in
                         urlValidationMessage = validateURL(newValue)
@@ -85,41 +79,24 @@ struct NPMHostEditorView: View {
             }
 
             Section("Authentication") {
-                Picker("Auth method", selection: $authMethod) {
-                    ForEach(NPMAuthMethod.allCases) { method in
-                        Text(method.displayName).tag(method)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                TextField("Email", text: $identity)
+                    .focused($focusedField, equals: .identity)
+                    #if os(iOS)
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.emailAddress)
+                    #endif
+                    .autocorrectionDisabled()
+                    #if os(iOS)
+                    .submitLabel(.next)
+                    #endif
+                    .onSubmit { focusedField = .secret }
 
-                if authMethod == .password {
-                    TextField("Email", text: $identity)
-                        .focused($focusedField, equals: .identity)
-                        #if os(iOS)
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.emailAddress)
-                        #endif
-                        .autocorrectionDisabled()
-                        #if os(iOS)
-                        .submitLabel(.next)
-                        #endif
-                        .onSubmit { focusedField = .secret }
-
-                    SecureField("Password", text: $secret)
-                        .focused($focusedField, equals: .secret)
-                        #if os(iOS)
-                        .submitLabel(.go)
-                        #endif
-                        .onSubmit { Task { await testConnection() } }
-                } else {
-                    SecureField("Paste API token", text: $secret)
-                        .focused($focusedField, equals: .secret)
-                        #if os(iOS)
-                        .submitLabel(.go)
-                        #endif
-                        .onSubmit { Task { await testConnection() } }
-                }
+                SecureField("Password", text: $secret)
+                    .focused($focusedField, equals: .secret)
+                    #if os(iOS)
+                    .submitLabel(.go)
+                    #endif
+                    .onSubmit { Task { await testConnection() } }
             }
 
             Section {
@@ -139,7 +116,7 @@ struct NPMHostEditorView: View {
         .toolbar { toolbarContent }
         .onAppear {
             if focusedField == nil {
-                focusedField = name.isEmpty ? .name : (authMethod == .password ? .identity : .secret)
+                focusedField = name.isEmpty ? .name : .identity
             }
         }
     }
@@ -179,12 +156,14 @@ struct NPMHostEditorView: View {
 
     private var canTest: Bool {
         let hasURL = !baseURL.isEmpty
-        let hasCred = authMethod == .password ? (!identity.isEmpty && !secret.isEmpty) : !secret.isEmpty
+        let hasCred = !identity.isEmpty && !secret.isEmpty
         return hasURL && hasCred && connectionTest != .testing
     }
 
     private var canSave: Bool {
-        !name.isEmpty && !baseURL.isEmpty && connectionTest != .testing
+        let mayReuseStoredPassword = existingHost?.authMethodRaw == "password"
+        let hasCredentials = !identity.isEmpty && (mayReuseStoredPassword || !secret.isEmpty)
+        return !name.isEmpty && !baseURL.isEmpty && hasCredentials && connectionTest != .testing
     }
 
     private func validateURL(_ raw: String) -> String? {
@@ -210,7 +189,6 @@ struct NPMHostEditorView: View {
             let candidate = NPMHost(
                 name: name.isEmpty ? "Test" : name,
                 baseURL: baseURL,
-                authMethod: authMethod,
                 identity: identity,
                 allowsInsecureTLS: allowsInsecureTLS
             )
@@ -239,7 +217,7 @@ struct NPMHostEditorView: View {
             if let existing = existingHost {
                 existing.name = name
                 existing.baseURL = baseURL
-                existing.authMethodRaw = authMethod.rawValue
+                existing.authMethodRaw = "password"
                 existing.identity = identity
                 existing.allowsInsecureTLS = allowsInsecureTLS
                 host = existing
@@ -247,7 +225,6 @@ struct NPMHostEditorView: View {
                 host = NPMHost(
                     name: name,
                     baseURL: baseURL,
-                    authMethod: authMethod,
                     identity: identity,
                     allowsInsecureTLS: allowsInsecureTLS
                 )

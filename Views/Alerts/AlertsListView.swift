@@ -26,7 +26,7 @@ struct AlertsListView: View {
                 contentList
             }
         }
-        .searchable(text: $viewModel.searchText, prompt: "Search alerts")
+        .searchable(text: $viewModel.searchText, placement: .alwaysVisible, prompt: "Search alerts")
         .refreshable { await viewModel.load() }
         .task { await viewModel.load() }
     }

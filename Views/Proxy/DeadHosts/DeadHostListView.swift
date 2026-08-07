@@ -34,7 +34,7 @@ struct DeadHostListView: View {
             }
         }
         .navigationTitle("404 Hosts")
-        .searchable(text: $viewModel.searchText, prompt: "Search domains")
+        .searchable(text: $viewModel.searchText, placement: .alwaysVisible, prompt: "Search domains")
         .refreshable { await viewModel.load() }
         .toolbar {
             ToolbarItem(placement: .platformTrailing) {

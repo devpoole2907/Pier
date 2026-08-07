@@ -10,6 +10,9 @@ struct StacksTab: View {
         NavigationStack {
             StacksContainer()
                 .navigationTitle("Stacks")
+                #if os(iOS)
+                .toolbarTitleDisplayMode(.inlineLarge)
+                #endif
                 .hostTitleMenu()
                 .navigationDestination(for: Stack.self) { stack in
                     StackDetailContainer(stack: stack)

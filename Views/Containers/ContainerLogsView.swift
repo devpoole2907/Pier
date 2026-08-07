@@ -31,7 +31,7 @@ struct ContainerLogsView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar { logsToolbar }
-        .searchable(text: $viewModel.searchText, prompt: "Search logs")
+        .searchable(text: $viewModel.searchText, placement: .alwaysVisible, prompt: "Search logs")
         .task { await viewModel.loadInitial() }
         .onChange(of: viewModel.tailCount) {
             Task { await viewModel.reload() }

@@ -34,7 +34,7 @@ struct StreamListView: View {
             }
         }
         .navigationTitle("Streams")
-        .searchable(text: $viewModel.searchText, prompt: "Search streams")
+        .searchable(text: $viewModel.searchText, placement: .alwaysVisible, prompt: "Search streams")
         .refreshable { await viewModel.load() }
         .toolbar {
             ToolbarItem(placement: .platformTrailing) {

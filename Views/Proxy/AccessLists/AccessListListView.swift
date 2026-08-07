@@ -34,7 +34,7 @@ struct AccessListListView: View {
             }
         }
         .navigationTitle("Access Lists")
-        .searchable(text: $viewModel.searchText, prompt: "Search lists")
+        .searchable(text: $viewModel.searchText, placement: .alwaysVisible, prompt: "Search lists")
         .refreshable { await viewModel.load() }
         .toolbar {
             ToolbarItem(placement: .platformTrailing) {

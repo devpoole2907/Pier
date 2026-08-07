@@ -26,7 +26,7 @@ struct VariablesListView: View {
                 contentList
             }
         }
-        .searchable(text: $viewModel.searchText, prompt: "Search variables")
+        .searchable(text: $viewModel.searchText, placement: .alwaysVisible, prompt: "Search variables")
         .refreshable { await viewModel.load() }
         .task { await viewModel.load() }
     }

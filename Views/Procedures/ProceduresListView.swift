@@ -29,7 +29,7 @@ struct ProceduresListView: View {
                 contentList
             }
         }
-        .searchable(text: $viewModel.searchText, prompt: "Search procedures")
+        .searchable(text: $viewModel.searchText, placement: .alwaysVisible, prompt: "Search procedures")
         .refreshable { await viewModel.load() }
         .task { await viewModel.load() }
         .confirmationDialog(
