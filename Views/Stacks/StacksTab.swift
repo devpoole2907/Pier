@@ -14,6 +14,9 @@ struct StacksTab: View {
                 .navigationDestination(for: Stack.self) { stack in
                     StackDetailContainer(stack: stack)
                 }
+                .navigationDestination(for: ContainerNavigationValue.self) { value in
+                    ContainerDetailContainer(navigationValue: value)
+                }
         }
     }
 }

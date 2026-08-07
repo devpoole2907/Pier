@@ -90,6 +90,7 @@ private struct MetricHistoryChart: View {
     let unit: String
     let points: [HistoryPoint]
     let orderedServerNames: [String]
+    @State private var selectedDate: Date?
 
     var body: some View {
         VStack(alignment: .leading, spacing: DesignSystem.Spacing.small) {
@@ -97,22 +98,67 @@ private struct MetricHistoryChart: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            Chart(points) { point in
-                LineMark(
-                    x: .value("Time", point.ts),
-                    y: .value(title, point.value)
-                )
-                .foregroundStyle(by: .value("Server", point.serverName))
-                .interpolationMethod(.catmullRom)
-                .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-
-                if isSingleSeries {
-                    AreaMark(
+            Chart {
+                ForEach(points) { point in
+                    LineMark(
                         x: .value("Time", point.ts),
                         y: .value(title, point.value)
                     )
-                    .foregroundStyle(seriesColor(for: point.serverName).opacity(0.1))
+                    .foregroundStyle(by: .value("Server", point.serverName))
                     .interpolationMethod(.catmullRom)
+                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+
+                    if isSingleSeries {
+                        AreaMark(
+                            x: .value("Time", point.ts),
+                            y: .value(title, point.value)
+                        )
+                        .foregroundStyle(seriesColor(for: point.serverName).opacity(0.1))
+                        .interpolationMethod(.catmullRom)
+                    }
+                }
+
+                if let selectedDate {
+                    RuleMark(x: .value("Selected time", selectedDate))
+                        .foregroundStyle(.secondary)
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                        .annotation(
+                            position: .top,
+                            spacing: DesignSystem.Spacing.tight,
+                            overflowResolution: .init(
+                                x: .fit(to: .chart),
+                                y: .disabled
+                            )
+                        ) {
+                            VStack(alignment: .leading, spacing: DesignSystem.Spacing.tight) {
+                                Text(selectedDate, format: .dateTime.month(.abbreviated).day().hour().minute())
+                                    .font(.caption)
+                                    .bold()
+
+                                ForEach(annotationPoints) { point in
+                                    HStack(spacing: DesignSystem.Spacing.tight) {
+                                        Image(systemName: "circle.fill")
+                                            .imageScale(.small)
+                                            .foregroundStyle(seriesColor(for: point.serverName))
+
+                                        if !isSingleSeries {
+                                            Text(point.serverName)
+                                                .lineLimit(1)
+                                        }
+
+                                        Text("\(point.value, format: .number.precision(.fractionLength(1)))\(unit)")
+                                            .monospacedDigit()
+                                    }
+                                    .font(.caption)
+                                }
+                            }
+                            .padding(.horizontal, DesignSystem.Spacing.small)
+                            .padding(.vertical, DesignSystem.Spacing.tight)
+                            .background(
+                                .regularMaterial,
+                                in: .rect(cornerRadius: DesignSystem.Radius.small)
+                            )
+                        }
                 }
             }
             .chartForegroundStyleScale(
@@ -139,7 +185,23 @@ private struct MetricHistoryChart: View {
                 }
             }
             .chartYScale(domain: 0...100)
+            .chartXSelection(value: $selectedDate)
             .frame(height: 160)
+        }
+    }
+
+    /// The closest sample from every series at the annotated time, kept in legend order so the
+    /// annotation remains stable while the user scrubs through the chart.
+    private var annotationPoints: [HistoryPoint] {
+        guard let selectedDate else { return [] }
+
+        return orderedServerNames.compactMap { serverName in
+            points
+                .filter { $0.serverName == serverName }
+                .min {
+                    abs($0.ts.timeIntervalSince(selectedDate))
+                        < abs($1.ts.timeIntervalSince(selectedDate))
+                }
         }
     }
 

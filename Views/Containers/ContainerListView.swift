@@ -37,18 +37,19 @@ struct ContainerListView: View {
             }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            if hostManager.servers.count > 1, !isSelecting {
+            if !isSelecting {
                 TrawlSegmentBar(
                     "Server scope",
                     selection: serverScopeBinding,
-                    items: serverScopeItems
+                    items: serverScopeItems,
+                    searchText: $viewModel.searchText,
+                    searchHint: "Search containers"
                 )
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: hostManager.activeServerID)
         .environment(\.editMode, $editMode)
-        .searchable(text: $viewModel.searchText, prompt: "Search containers")
         .refreshable { await viewModel.refresh(includeStopped: showStoppedContainers) }
         .toolbar { selectionToolbar }
         .alert(item: $pendingBulkAction, content: bulkContainerAlert)

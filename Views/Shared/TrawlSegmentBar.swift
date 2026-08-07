@@ -9,7 +9,7 @@ struct TrawlSegmentBar<Selection: Hashable>: View {
     var searchHint: String?
     var searchText: Binding<String>?
     var externalSearchExpanded: Binding<Bool>?
-    var searchPlacement: TrawlSegmentBarSearchPlacement = .trailing
+    var searchPlacement: TrawlSegmentBarSearchPlacement = .leading
     var onSearchActivated: (Bool) -> Void = { _ in }
 
     @Environment(\.colorScheme) private var colorScheme
@@ -39,7 +39,7 @@ struct TrawlSegmentBar<Selection: Hashable>: View {
         searchText: Binding<String>,
         searchHint: String,
         isSearchExpanded: Binding<Bool>? = nil,
-        searchPlacement: TrawlSegmentBarSearchPlacement = .trailing,
+        searchPlacement: TrawlSegmentBarSearchPlacement = .leading,
         horizontalPadding: CGFloat = 15,
         alignment: TrawlSegmentBarAlignment = .leading,
         onSearchActivated: @escaping (Bool) -> Void = { _ in }
