@@ -20,45 +20,47 @@ struct ImagesListView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            if !hostManager.servers.isEmpty {
+        Group {
+            if viewModel.items.isEmpty, viewModel.isLoading {
+                LoadingView(message: "Loading images…")
+            } else if let error = viewModel.loadError, viewModel.items.isEmpty {
+                ErrorView(error: error, retry: {
+                    Task { await viewModel.load() }
+                })
+            } else if viewModel.items.isEmpty {
+                EmptyStateView(
+                    title: "No images",
+                    systemImage: "photo.stack",
+                    message: "No Docker images were found."
+                )
+            } else if viewModel.visibleItems.isEmpty {
+                ContentUnavailableView.search
+            } else {
+                // Only bind the selection set while actively selecting. Otherwise a plain tap on a
+                // NavigationLink row can populate the set, leaving a phantom "1 selected" subtitle after
+                // navigating back even though edit mode was never entered.
+                List(selection: isSelecting ? $selectedImageIDs : .constant([])) {
+                    ForEach(viewModel.visibleItems) { item in
+                        row(for: item)
+                    }
+                }
+                .softScrollEdges()
+            }
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if !isSelecting {
                 TrawlSegmentBar(
                     "Server scope",
                     selection: serverScopeBinding,
-                    items: serverScopeItems
+                    items: serverScopeItems,
+                    searchText: $viewModel.searchText,
+                    searchHint: "Search images"
                 )
-            }
-
-            Group {
-                if viewModel.items.isEmpty, viewModel.isLoading {
-                    LoadingView(message: "Loading images…")
-                } else if let error = viewModel.loadError, viewModel.items.isEmpty {
-                    ErrorView(error: error, retry: {
-                        Task { await viewModel.load() }
-                    })
-                } else if viewModel.items.isEmpty {
-                    EmptyStateView(
-                        title: "No images",
-                        systemImage: "photo.stack",
-                        message: "No Docker images were found."
-                    )
-                } else if viewModel.visibleItems.isEmpty {
-                    ContentUnavailableView.search
-                } else {
-                    // Only bind the selection set while actively selecting. Otherwise a plain tap on a
-                    // NavigationLink row can populate the set, leaving a phantom "1 selected" subtitle after
-                    // navigating back even though edit mode was never entered.
-                    List(selection: isSelecting ? $selectedImageIDs : .constant([])) {
-                        ForEach(viewModel.visibleItems) { item in
-                            row(for: item)
-                        }
-                    }
-                    .softScrollEdges()
-                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: hostManager.activeServerID)
         .environment(\.editMode, $editMode)
-        .searchable(text: $viewModel.searchText, placement: .alwaysVisible, prompt: "Search images")
         .refreshable { await viewModel.load() }
         .toolbar { imagesToolbar }
         .navigationSubtitle(navigationSubtitleText)
@@ -135,7 +137,11 @@ struct ImagesListView: View {
     private var serverScopeBinding: Binding<String?> {
         Binding(
             get: { hostManager.activeServerID },
-            set: { hostManager.setActiveServer($0) }
+            set: { newValue in
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                    hostManager.setActiveServer(newValue)
+                }
+            }
         )
     }
 

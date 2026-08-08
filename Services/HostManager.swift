@@ -5,26 +5,25 @@ import OSLog
 
 private let hostsLogger = Logger(subsystem: "com.poole.james.pier", category: "hosts")
 
-/// Top-level coordinator for hosts. Owns the active host selection and a cache of
-/// `KomodoClient` actor instances keyed by host UUID, so we don't tear them down every time the
-/// user navigates.
+/// Top-level coordinator for Pier's single Komodo Core connection. It keeps one cached
+/// `KomodoClient` actor so navigation does not repeatedly rebuild the connection.
 ///
 /// Komodo makes Servers a first-class, visible concept rather than a hidden implementation
 /// detail. A Komodo Core commonly manages several Servers, so `HostManager` also owns the active
 /// server filter (`activeServerID`, `nil` = "All servers") and the list of servers available
-/// under the active host, for a picker in each tab's nav title menu.
+/// under the configured Core, for a picker in each tab's nav title menu.
 ///
 /// Lives on the main actor because views observe its state directly.
 @MainActor
 @Observable
 final class HostManager {
-    /// The currently selected host. Persisted via `UserDefaults`.
+    /// The configured Core's stable identifier. Persisted via `UserDefaults`.
     private(set) var activeHostID: UUID?
 
-    /// The active server filter within the active host. `nil` means "All servers".
+    /// The active server filter within the configured Core. `nil` means "All servers".
     var activeServerID: String?
 
-    /// Servers available under the active host, loaded when the host becomes active.
+    /// Servers available under the configured Core.
     private(set) var servers: [KomodoServer] = []
 
     /// Cached error from the most recent connection attempt - shown by views as needed.
@@ -32,7 +31,8 @@ final class HostManager {
     var isPresentingHostEditor = false
     var editingHost: Host?
 
-    private var clients: [UUID: KomodoClient] = [:]
+    private var cachedClientHostID: UUID?
+    private var cachedClient: KomodoClient?
     private let activeHostKey = "com.poole.james.pier.activeHostID"
     private func activeServerKey(for hostID: UUID) -> String {
         "com.poole.james.pier.activeServerID.\(hostID.uuidString)"
@@ -45,18 +45,19 @@ final class HostManager {
         }
     }
 
-    /// Returns (or lazily creates) the client for a host.
+    /// Returns (or lazily creates) the client for the configured Core.
     func client(for host: Host) throws -> KomodoClient {
-        if let existing = clients[host.id] {
-            return existing
+        if cachedClientHostID == host.id, let cachedClient {
+            return cachedClient
         }
         let client = try KomodoClient(host: host, allowsInsecureTLS: host.allowsInsecureTLS)
-        clients[host.id] = client
+        cachedClientHostID = host.id
+        cachedClient = client
         hostsLogger.debug("Created Komodo client for host \(host.id.uuidString, privacy: .private(mask: .hash))")
         return client
     }
 
-    /// Selects the host as active, loading its servers so the picker and default filter are ready.
+    /// Activates the configured Core and loads its servers so the server picker is ready.
     func setActive(_ host: Host) async {
         hostsLogger.info("Setting active host to \(host.id.uuidString, privacy: .private(mask: .hash))")
         activeHostID = host.id
@@ -80,10 +81,13 @@ final class HostManager {
         }
     }
 
-    /// Removes any cached client / credentials for a host.
+    /// Removes the cached client and credentials for the configured Core.
     func forget(_ host: Host) {
         hostsLogger.info("Forgetting host \(host.id.uuidString, privacy: .private(mask: .hash))")
-        clients[host.id] = nil
+        if cachedClientHostID == host.id {
+            cachedClientHostID = nil
+            cachedClient = nil
+        }
         try? KeychainService.delete(for: host.id)
         UserDefaults.standard.removeObject(forKey: activeServerKey(for: host.id))
         if activeHostID == host.id {
@@ -106,7 +110,9 @@ final class HostManager {
 
     func invalidateClient(for host: Host) {
         hostsLogger.debug("Invalidating cached client for host \(host.id.uuidString, privacy: .private(mask: .hash))")
-        clients[host.id] = nil
+        guard cachedClientHostID == host.id else { return }
+        cachedClientHostID = nil
+        cachedClient = nil
     }
 
     /// Loads the server list for a host. Called when a host becomes active, and to retry after

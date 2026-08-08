@@ -4,7 +4,8 @@ import OSLog
 
 private let hostEditorLogger = Logger(subsystem: "com.poole.james.pier", category: "hosts.editor")
 
-/// Add/edit a Komodo host. Tests the connection before saving so the user knows the API key/secret work.
+/// Configures Pier's single Komodo Core connection. Tests the connection before saving so the
+/// user knows the API key/secret work.
 struct HostEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -16,6 +17,7 @@ struct HostEditorView: View {
     @State private var apiSecret: String = ""
     @State private var allowsInsecureTLS: Bool
     @State private var connectionTest: ConnectionTestState = .idle
+    @State private var isShowingRemoveConfirmation = false
     @FocusState private var focusedField: Field?
     @State private var urlValidationMessage: String?
 
@@ -105,8 +107,26 @@ struct HostEditorView: View {
 
                 connectionTestStatusView
             }
+
+            if existingHost != nil {
+                Section {
+                    Button("Remove Komodo Connection", systemImage: "trash", role: .destructive) {
+                        isShowingRemoveConfirmation = true
+                    }
+                    .confirmationDialog(
+                        "Remove Komodo connection?",
+                        isPresented: $isShowingRemoveConfirmation,
+                        titleVisibility: .visible
+                    ) {
+                        Button("Remove Connection", role: .destructive, action: removeConnection)
+                        Button("Cancel", role: .cancel) { }
+                    } message: {
+                        Text("Pier will remove the Core configuration and its saved credentials. Servers and containers managed by Komodo are not affected.")
+                    }
+                }
+            }
         }
-        .navigationTitle(existingHost == nil ? "Add host" : "Edit host")
+        .navigationTitle(existingHost == nil ? "Connect Komodo" : "Edit Komodo")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -208,6 +228,14 @@ struct HostEditorView: View {
     private func save() async {
         hostEditorLogger.info("Saving host configuration")
         do {
+            if existingHost == nil {
+                let existingHostCount = try modelContext.fetchCount(FetchDescriptor<Host>())
+                guard existingHostCount == 0 else {
+                    connectionTest = .failure("A Komodo Core is already configured. Edit it in Settings.")
+                    return
+                }
+            }
+
             let host: Host
             let hasNewCredentials = !apiKey.isEmpty && !apiSecret.isEmpty
 
@@ -239,6 +267,20 @@ struct HostEditorView: View {
         } catch {
             connectionTest = .failure(error.localizedDescription)
             hostEditorLogger.error("Failed to save host configuration: \(error.localizedDescription, privacy: .private)")
+        }
+    }
+
+    private func removeConnection() {
+        guard let existingHost else { return }
+        hostManager.forget(existingHost)
+        modelContext.delete(existingHost)
+        do {
+            try modelContext.save()
+            hostEditorLogger.info("Removed host configuration")
+            dismiss()
+        } catch {
+            connectionTest = .failure(error.localizedDescription)
+            hostEditorLogger.error("Failed to remove host configuration: \(error.localizedDescription, privacy: .private)")
         }
     }
 

@@ -64,29 +64,12 @@ struct PierApp: App {
         .defaultSize(width: 900, height: 600)
         .modelContainer(modelContainer)
         .commands {
-            PierCommands(hostManager: hostManager)
             SidebarCommands()
         }
     }
 
     private var currentTheme: AppTheme {
         AppTheme(rawValue: themeRawValue) ?? .system
-    }
-}
-
-private struct PierCommands: Commands {
-    let hostManager: HostManager
-
-    var body: some Commands {
-        @Bindable var hostManager = hostManager
-
-        CommandGroup(replacing: .newItem) {
-            Button("New Host…") {
-                hostManager.isPresentingHostEditor = true
-            }
-            .keyboardShortcut("n")
-            .disabled(hostManager.isPresentingHostEditor)
-        }
     }
 }
 

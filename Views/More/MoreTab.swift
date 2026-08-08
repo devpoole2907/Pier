@@ -87,7 +87,7 @@ struct MoreTab: View {
                 Section {
                     NavigationLink(value: MoreDestination.settings) {
                         moreRow(icon: "gearshape.fill", color: MoreDestinationAccent.settings.color,
-                                title: "Settings", subtitle: "Hosts, display, refresh, and app preferences")
+                                title: "Settings", subtitle: "Connections, display, refresh, and app preferences")
                     }
                 }
             }
@@ -123,44 +123,37 @@ struct MoreTab: View {
         case .servers:
             ServersContainer()
                 .navigationTitle("Servers")
-                .hostTitleMenu()
                 .moreDestinationTitleStyle()
                 .moreDestinationBackground(.servers)
         case .alerts:
             AlertsContainer()
-                .hostTitleMenu()
                 .moreDestinationTitleStyle()
                 .moreDestinationBackground(.alerts)
         case .containers:
             ContainerListContainer()
                 .navigationTitle("Containers")
-                .hostTitleMenu()
                 .serverScopeMenu()
                 .moreDestinationTitleStyle()
                 .moreDestinationBackground(.containers)
         case .deployments:
             DeploymentsContainer()
                 .navigationTitle("Deployments")
-                .hostTitleMenu()
                 .serverScopeMenu()
                 .moreDestinationTitleStyle()
                 .moreDestinationBackground(.deployments)
         case .variables:
             VariablesContainer()
                 .navigationTitle("Variables")
-                .hostTitleMenu()
                 .moreDestinationTitleStyle()
                 .moreDestinationBackground(.variables)
         case .images:
             ImagesContainer()
                 .navigationTitle("Images")
-                .hostTitleMenu()
                 .serverScopeMenu()
                 .moreDestinationTitleStyle()
                 .moreDestinationBackground(.images)
         case .procedures:
             ProceduresContainer()
-                .hostTitleMenu()
                 .moreDestinationTitleStyle()
                 .moreDestinationBackground(.procedures)
         case .settings:

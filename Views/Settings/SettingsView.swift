@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
 
-/// Main settings screen. Splits configuration into sections: hosts, refresh, theme, display, about.
+/// Main settings screen. Splits configuration into sections: integrations, refresh, theme, display, about.
 struct SettingsView: View {
     @Environment(HostManager.self) private var hostManager
     @Environment(NPMHostManager.self) private var npmHostManager
@@ -13,16 +13,16 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("Hosts") {
+            Section("Komodo") {
                 NavigationLink {
-                    HostsListView()
+                    HostEditorView(host: configuredKomodoHost)
                 } label: {
                     LabeledContent {
-                        Text(activeHostName)
+                        Text(configuredKomodoHost?.name ?? "Not configured")
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     } label: {
-                        Label("Manage Komodo hosts", systemImage: "externaldrive")
+                        Label("Komodo Core", systemImage: "externaldrive")
                     }
                 }
             }
@@ -85,12 +85,12 @@ struct SettingsView: View {
         return "\(version) (\(build))"
     }
 
-    private var activeHostName: String {
-        guard let activeHostID = hostManager.activeHostID,
-              let activeHost = hosts.first(where: { $0.id == activeHostID }) else {
-            return "None"
+    private var configuredKomodoHost: Host? {
+        if let activeHostID = hostManager.activeHostID,
+           let activeHost = hosts.first(where: { $0.id == activeHostID }) {
+            return activeHost
         }
-        return activeHost.name
+        return hosts.first
     }
 
     private var activeNPMHostName: String {

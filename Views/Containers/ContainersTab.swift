@@ -15,7 +15,6 @@ struct ContainersTab: View {
                 #if os(iOS)
                 .toolbarTitleDisplayMode(.inlineLarge)
                 #endif
-                .hostTitleMenu()
                 .serverScopeMenu()
                 .navigationDestination(for: ContainerNavigationValue.self) { value in
                     ContainerDetailContainer(navigationValue: value)

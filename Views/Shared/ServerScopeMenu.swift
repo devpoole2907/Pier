@@ -2,9 +2,8 @@ import SwiftUI
 
 /// Title-menu server scope picker. Komodo Cores manage multiple Servers, so the Docker resource
 /// lists (containers, images, stacks) are scoped by an active server — or "All servers" when the
-/// scope is `nil`. This mirrors `HostTitleMenu` but selects the server within the active host.
-///
-/// Apply *after* `hostTitleMenu()` so both sections share the navigation title menu.
+/// scope is `nil`. Pier connects to one Komodo Core, while this menu selects among the Servers
+/// managed by that Core.
 struct ServerScopeMenu: ViewModifier {
     @Environment(HostManager.self) private var hostManager
 

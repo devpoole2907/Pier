@@ -77,7 +77,6 @@ struct AppRootView: View {
                         #if os(iOS)
                         .toolbarTitleDisplayMode(.inlineLarge)
                         #endif
-                        .hostTitleMenu()
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {
                                 Button {
@@ -158,20 +157,18 @@ struct AppRootView: View {
         }
     }
 
-    /// On launch, if there is no active host yet, pick the first known host and load its servers.
-    /// If there are no Komodo hosts, leave the tab-level empty states in control.
+    /// On launch, activate Pier's configured Komodo Core and load its servers. If there is no
+    /// Komodo connection, leave the tab-level empty states in control.
     private func ensureActiveHost() async {
         guard !shouldShowWelcomeScreen else { return }
-        if hosts.isEmpty {
+        guard let host = activeKomodoHost else {
             hostManager.isPresentingHostEditor = false
             return
         }
         hostManager.isPresentingHostEditor = false
-        if hostManager.activeHostID == nil, let first = hosts.first {
-            await hostManager.setActive(first)
-        } else if let activeID = hostManager.activeHostID,
-                  let host = hosts.first(where: { $0.id == activeID }),
-                  hostManager.servers.isEmpty {
+        if hostManager.activeHostID != host.id {
+            await hostManager.setActive(host)
+        } else if hostManager.servers.isEmpty {
             await hostManager.refreshServers(for: host)
         }
     }

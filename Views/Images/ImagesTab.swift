@@ -8,7 +8,6 @@ struct ImagesTab: View {
         NavigationStack {
             ImagesContainer()
                 .navigationTitle("Images")
-                .hostTitleMenu()
                 .serverScopeMenu()
         }
     }

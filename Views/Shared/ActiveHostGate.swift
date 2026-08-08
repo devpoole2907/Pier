@@ -66,7 +66,7 @@ struct ActiveHostGate<Content: View>: View {
     }
 
     private var editServerActionTitle: String? {
-        activeHost == nil ? nil : "Edit Server"
+        activeHost == nil ? nil : "Edit Komodo Connection"
     }
 
     private var editServerAction: (() -> Void)? {
